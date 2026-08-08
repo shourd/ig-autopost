@@ -1,0 +1,41 @@
+# ig-autopost configuration.
+# Nothing in src/ hardcodes these values.
+
+border:
+  canvas_w: 1080
+  canvas_h: 1350          # 4:5 — sits exactly on Meta's aspect-ratio floor
+  min_margin_px: 26       # measured from existing @snaps_by_sjoerd posts
+  background: "#FFFFFF"
+  jpeg_quality: 92
+  max_bytes: 8388608      # 8 MB, Meta's hard limit for image containers
+
+# Cosmetic only — drives the mock Instagram header in the curation app so the
+# grid is previewed in context. Edit freely; nothing here reaches the Meta API.
+profile:
+  username: sjoerdvanrooijen
+  display_name: Sjoerd
+  bio: avonduren avonturen
+  posts: 101              # null = count the files in photos/posted/
+  followers: 859
+  following: 762
+  avatar: null            # path to a square image, relative to the repo root
+  highlights: [savannah, mountains, oceans]
+
+schedule:
+  weekday: 0              # 0 = Monday, matching the GitHub Actions cron
+  hour_utc: 8
+
+caption:
+  # Auto-drafting is switched off — Sjoerd writes captions by hand. The module
+  # and its tests stay in the tree; flip `enabled` back to true to re-arm it.
+  enabled: false
+  model: "claude-opus-5"
+  max_tokens: 2000
+  effort: low              # a one-line caption; low keeps cost and latency down
+  max_chars: 90            # style guard, not an API limit
+
+paths:
+  raw: photos/raw
+  processed: photos/processed
+  posted: photos/posted
+  queue: queue.yaml
