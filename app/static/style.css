@@ -1,0 +1,271 @@
+/* White, mimicking the Instagram profile the queue will land on. The photos
+   carry white borders, so a white page is also the honest preview: the border
+   dissolves into the page exactly as it will on the real profile. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink: #000;
+  --dim: #737373;
+  --line: #dbdbdb;
+  --chip: #efefef;
+  --link: #0095f6;
+  --warn: #c8811a;
+  --gap: 2px;
+}
+
+body {
+  font: 14px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif;
+  color: var(--ink);
+  background: #fff;
+  height: 100vh;
+  overflow: hidden;
+}
+
+main { display: flex; height: 100%; }
+
+/* --- the mock phone column ------------------------------------------------ */
+
+#phone {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 80px;
+}
+
+#profile {
+  max-width: 470px;
+  margin: 0 auto;
+  padding: 22px 16px 0;
+}
+
+.top { display: flex; align-items: center; gap: 26px; }
+
+#avatar {
+  width: 86px; height: 86px;
+  border-radius: 50%;
+  flex: none;
+  background: #efefef center/cover no-repeat;
+  border: 1px solid var(--line);
+}
+
+.who { flex: 1; }
+#display-name { font-weight: 600; margin-bottom: 10px; }
+
+.stats { display: flex; list-style: none; gap: 26px; }
+.stats li { display: flex; flex-direction: column; }
+.stats b { font-size: 17px; font-weight: 600; }
+.stats span { color: var(--dim); font-size: 13px; }
+
+#bio { margin: 14px 0 0; }
+
+.profile-buttons { display: flex; gap: 8px; margin: 14px 0 0; }
+.profile-buttons button {
+  flex: 1;
+  font: inherit;
+  font-weight: 600;
+  background: var(--chip);
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--ink);
+  opacity: .75;
+}
+
+#highlights { display: flex; gap: 18px; list-style: none; margin: 20px 0 4px; }
+#highlights li { text-align: center; width: 68px; }
+#highlights .ring {
+  width: 62px; height: 62px;
+  border-radius: 50%;
+  background: #efefef;
+  border: 1px solid var(--line);
+  margin: 0 auto 6px;
+}
+#highlights span {
+  font-size: 12px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+}
+.tab {
+  flex: 1;
+  height: 44px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  color: #b0b0b0;
+}
+.tab.on { color: var(--ink); }
+.tab svg { width: 22px; height: 22px; display: block; }
+.tab.on::before {
+  content: "";
+  position: absolute;
+  top: -1px; left: 0; right: 0;
+  height: 1.5px;
+  background: var(--ink);
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 19px;
+  margin-bottom: 20px;
+}
+.titlebar b { font-weight: 700; }
+.titlebar .caret { color: var(--dim); font-size: 15px; }
+
+/* --- grid ----------------------------------------------------------------- */
+
+#grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap);
+  max-width: 470px;
+  margin: 0 auto;
+}
+
+#empty { color: var(--dim); text-align: center; margin-top: 40px; }
+code { background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+
+.cell {
+  position: relative;
+  aspect-ratio: 4 / 5;         /* the post itself — one view, no toggle */
+  background: #fafafa;
+  overflow: hidden;
+  cursor: pointer;
+}
+.cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.cell.queued { cursor: grab; }
+.cell.queued:active { cursor: grabbing; }
+.cell.dragging { opacity: .4; }
+.cell.selected::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  outline: 2px solid var(--link);
+  outline-offset: -2px;
+  pointer-events: none;
+}
+.cell.hold img { filter: grayscale(1) opacity(.45); }
+
+/* Everything below the queue is already live; a dimming veil plus a tick makes
+   the boundary between "posted" and "still to come" unmistakable. */
+.cell.posted img { opacity: .55; }
+
+.when {
+  position: absolute;
+  top: 6px; left: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .92);
+  border: 1px solid var(--line);
+  color: var(--dim);
+  white-space: nowrap;
+}
+.cell.next .when { background: var(--link); border-color: var(--link); color: #fff; }
+
+.mark {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .92);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--dim);
+}
+.mark.warn { background: var(--warn); border-color: var(--warn); color: #fff; }
+
+/* --- side panel ----------------------------------------------------------- */
+
+#panel {
+  width: 340px;
+  flex: none;
+  border-left: 1px solid var(--line);
+  padding: 18px 16px;
+  overflow-y: auto;
+  background: #fff;
+}
+
+#panel h2 { font-size: 14px; font-weight: 600; word-break: break-all; }
+#panel .meta { color: var(--dim); font-size: 12.5px; margin-bottom: 4px; }
+.placeholder { color: var(--dim); }
+
+label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--dim);
+  margin: 16px 0 6px;
+}
+
+textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  resize: vertical;
+}
+textarea:focus { outline: none; border-color: #a8a8a8; }
+/* An untouched draft reads as provisional at a glance. */
+textarea.draft { color: var(--dim); font-style: italic; }
+
+.hint { font-size: 12.5px; color: var(--dim); margin-top: 7px; }
+.hint.warn { color: var(--warn); }
+.hint.ok { color: #2a7f3e; }
+
+.row { display: flex; gap: 8px; margin-top: 16px; }
+
+button.act {
+  flex: 1;
+  font: inherit;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+button.act:hover { background: #fafafa; }
+button.act.primary { background: var(--link); border-color: var(--link); color: #fff; }
+button.act.primary:hover { filter: brightness(1.06); }
+button.act:disabled { opacity: .45; cursor: default; }
+
+.divider { border-top: 1px solid var(--line); margin: 18px 0 0; }
+
+/* --- toast ---------------------------------------------------------------- */
+
+#toast {
+  position: fixed;
+  bottom: 18px; left: 50%;
+  transform: translateX(-50%);
+  background: #262626;
+  color: #fff;
+  border-radius: 10px;
+  padding: 11px 16px;
+  max-width: 70vw;
+  white-space: pre-wrap;
+  font-size: 13px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .22);
+  z-index: 10;
+}
+#toast.bad { background: #b3261e; }

@@ -1,0 +1,17 @@
+# Raw exports stay local — big, and the runner never needs them.
+# NOTE: photos/processed/ and photos/posted/ are deliberately NOT ignored.
+# The GitHub Actions runner uploads photos/processed/<file>, so it must be in git.
+photos/raw/
+
+.env
+.venv/
+__pycache__/
+*.pyc
+.cache/
+tests/fixtures/
+.pytest_cache/
+.DS_Store
+.curation.json
+
+# Machine-local: absolute Homebrew paths, permission grants for this checkout.
+.claude/settings.local.json

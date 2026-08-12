@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>queue preview</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main>
+    <section id="phone">
+      <!-- Mock profile header, so the queue is judged in the context it lands in. -->
+      <header id="profile">
+        <div class="titlebar"><b id="username"></b><span class="caret">⌄</span></div>
+        <div class="top">
+          <div id="avatar"></div>
+          <div class="who">
+            <p id="display-name"></p>
+            <ul class="stats">
+              <li><b id="stat-posts">–</b><span>posts</span></li>
+              <li><b id="stat-followers">–</b><span>followers</span></li>
+              <li><b id="stat-following">–</b><span>following</span></li>
+            </ul>
+          </div>
+        </div>
+        <p id="bio"></p>
+        <div class="profile-buttons">
+          <button type="button" disabled>Edit Profile</button>
+          <button type="button" disabled>Share Profile</button>
+        </div>
+        <ul id="highlights"></ul>
+        <nav class="tabs">
+          <span class="tab on" title="Grid">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor">
+              <rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9.5" y="2" width="5" height="5" rx="1"/><rect x="17" y="2" width="5" height="5" rx="1"/>
+              <rect x="2" y="9.5" width="5" height="5" rx="1"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><rect x="17" y="9.5" width="5" height="5" rx="1"/>
+              <rect x="2" y="17" width="5" height="5" rx="1"/><rect x="9.5" y="17" width="5" height="5" rx="1"/><rect x="17" y="17" width="5" height="5" rx="1"/>
+            </g></svg>
+          </span>
+          <span class="tab" title="Reels">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
+              <rect x="2" y="3" width="20" height="18" rx="4"/><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none"/>
+            </svg>
+          </span>
+          <span class="tab" title="Tagged">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="12" r="9.5" stroke-dasharray="3 2.6"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </span>
+        </nav>
+      </header>
+
+      <div id="grid"></div>
+      <p id="empty" hidden>Nothing in <code>photos/raw/</code> yet.</p>
+    </section>
+
+    <aside id="panel"></aside>
+  </main>
+
+  <div id="toast" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
