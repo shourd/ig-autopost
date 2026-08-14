@@ -33,8 +33,8 @@ schedule:
     # 0 = Monday. Wednesday late morning is the most consistently cited window
     # across published studies; Sunday morning is the leisure-scrolling one.
     - {weekday: 2, hour: 11, minute: 30}   # Wednesday
+    - {weekday: 4, hour: 18, minute: 0}    # Friday, start of the evening
     - {weekday: 6, hour: 10, minute: 30}   # Sunday
-    # - {weekday: 4, hour: 18, minute: 0}  # Friday evening — uncomment for 3/week
 
 publish:
   api_version: v26.0      # pinned; Meta retires versions on a ~2-year clock
@@ -42,6 +42,10 @@ publish:
   poll_attempts: 20       # container processing is usually <5s, allow ~60s
   poll_seconds: 3
   todoist: true           # a "post is live" task; failure never rolls back a post
+  # A Todoist task per upcoming post, due at its slot, so posting stays manual
+  # but never gets forgotten. Rewritten on every Save.
+  reminders: true
+  reminder_count: 4       # only the next few — the queue can be a hundred deep
 
 caption:
   # Suggestions only: the app offers three drafts per photo and never fills the

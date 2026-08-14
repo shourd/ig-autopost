@@ -12,6 +12,10 @@ Instagram publishing is a three-step dance, not one upload:
     GET  /<container>?status_code -> poll until FINISHED
     POST /<IG_ID>/media_publish  -> the live post
 
+A carousel is the same dance with an extra lap: one container per photo marked
+`is_carousel_item`, each polled to FINISHED, then a parent container with
+`media_type=CAROUSEL` that carries the caption and lists the children.
+
 Meta pulls the JPEG from a public HTTPS URL rather than accepting an upload,
 which is why the file has to be committed and pushed before this runs. The
 pre-flight check below is the difference between a clear error here and an
@@ -106,13 +110,37 @@ def _post(url: str, **data) -> dict:
     return payload
 
 
-def create_container(photo, url: str, token: str, ig_id: str, cfg) -> str:
-    params = {"image_url": url, "caption": photo.caption, "access_token": token}
+def create_container(photo, urls: list[str], token: str, ig_id: str, cfg) -> str:
+    """Stage the post and return its container id. Two shapes, one entry point.
+
+    A single photo is one container. A carousel is one container per photo with
+    `is_carousel_item`, each of which must finish ingesting on its own, and then
+    a parent container that carries the caption and lists the children. Getting
+    this wrong is silent: a caption on a child is simply dropped.
+    """
+    endpoint = f"{_graph(cfg)}/{ig_id}/media"
+    params = {"caption": photo.caption, "access_token": token}
     # location_id is passed through from queue.yaml, never synthesised — and on
     # the Instagram Login path it is simply unavailable, so it stays absent.
     if photo.location_id:
         params["location_id"] = photo.location_id
-    return _post(f"{_graph(cfg)}/{ig_id}/media", **params)["id"]
+
+    if len(urls) == 1:
+        return _post(endpoint, image_url=urls[0], **params)["id"]
+
+    children = []
+    for index, url in enumerate(urls, start=1):
+        child = _post(
+            endpoint, image_url=url, is_carousel_item="true", access_token=token
+        )["id"]
+        print(f"        child {index}/{len(urls)}: {child}")
+        # Children have to be FINISHED before the parent can reference them.
+        await_ready(child, token, cfg)
+        children.append(child)
+
+    return _post(
+        endpoint, media_type="CAROUSEL", children=",".join(children), **params
+    )["id"]
 
 
 def await_ready(container: str, token: str, cfg) -> None:
@@ -167,27 +195,42 @@ def todoist_task(permalink: str, photo, cfg) -> None:
 # --- the run ---------------------------------------------------------------
 
 
-def publish_next(state: State | None = None, confirm: bool = False) -> dict:
+def publish_next(
+    state: State | None = None, confirm: bool = False, file: str | None = None
+) -> dict:
     cfg = load_config()
     state = state or State()
     token, ig_id = secret("META_ACCESS_TOKEN"), secret("IG_USER_ID")
 
-    photo = next((p for p in state.ordered() if p.status == STATUS_READY), None)
+    ready = [p for p in state.ordered() if p.status == STATUS_READY]
+    if file:
+        photo = next((p for p in state.ordered() if p.file == file), None)
+        if photo is None:
+            return {"ok": False, "reason": f"{file} isn't in the queue."}
+        if photo.status != STATUS_READY:
+            return {"ok": False, "reason": f"{file} is {photo.status} — un-hold it first."}
+    else:
+        photo = next(iter(ready), None)
     if photo is None:
         return {"ok": False, "reason": "Queue is empty — nothing to publish."}
 
-    processed = state.processed_path(photo.file)
-    if not processed.is_file():
-        raise PublishError(f"{processed} doesn't exist. Run Save in the curation app first.")
+    urls = []
+    for name in photo.files:
+        processed = state.processed_path(name)
+        if not processed.is_file():
+            raise PublishError(f"{processed} doesn't exist. Run Save in the curation app first.")
+        urls.append(image_url(processed.name, cfg))
 
-    url = image_url(processed.name, cfg)
-    print(f"\n  Next up: {photo.file}")
+    kind = f"carousel of {len(urls)}" if photo.is_carousel else "single photo"
+    print(f"\n  Next up: {photo.file} ({kind})")
     print(f"  Caption: {photo.caption or '(empty)'}")
-    print(f"  Image:   {url}")
+    for url in urls:
+        print(f"  Image:   {url}")
 
     print("\n  [1/4] checking Meta can fetch the image…")
-    preflight(url)
-    print("        reachable, image/jpeg")
+    for url in urls:
+        preflight(url)
+    print(f"        {len(urls)} reachable, image/jpeg")
 
     # An empty caption is legal at the API and almost never intended — captions
     # are hand-written now, so blank means "not written yet", not "no caption
@@ -206,14 +249,15 @@ def publish_next(state: State | None = None, confirm: bool = False) -> dict:
             "ok": True,
             "dry_run": True,
             "file": photo.file,
+            "files": photo.files,
             "caption": photo.caption,
-            "url": url,
+            "url": urls[0],
             "warnings": warnings,
             "reason": "Dry run — everything checks out. Re-run with --confirm to publish.",
         }
 
     print("  [2/4] creating the media container…")
-    container = create_container(photo, url, token, ig_id, cfg)
+    container = create_container(photo, urls, token, ig_id, cfg)
     print(f"        container {container}")
 
     print("  [3/4] waiting for Meta to ingest…")
@@ -244,11 +288,13 @@ def publish_next(state: State | None = None, confirm: bool = False) -> dict:
 
 
 def _mark_posted(state: State, photo, media_id: str, permalink: str, cfg) -> None:
-    """Move the file, update the queue, commit. Never before the post is live."""
-    src = state.processed_path(photo.file)
-    dst = cfg.paths.posted / src.name
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    src.replace(dst)
+    """Move the files, update the queue, commit. Never before the post is live."""
+    for name in photo.files:
+        src = state.processed_path(name)
+        dst = cfg.paths.posted / src.name
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if src.is_file():
+            src.replace(dst)
 
     photo.status = STATUS_POSTED
     state.save()
@@ -287,10 +333,13 @@ def main() -> None:
     parser.add_argument(
         "--confirm", action="store_true", help="actually publish (default is a dry run)"
     )
+    parser.add_argument(
+        "--file", help="publish this queued photo instead of the one at the front"
+    )
     args = parser.parse_args()
 
     try:
-        result = publish_next(confirm=args.confirm)
+        result = publish_next(confirm=args.confirm, file=args.file)
     except PublishError as exc:
         print(f"\n  FAILED: {exc}\n", file=sys.stderr)
         raise SystemExit(1)

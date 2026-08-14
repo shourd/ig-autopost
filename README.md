@@ -10,12 +10,47 @@ Two halves that never run at the same time:
 
 ## Schedule
 
-`config.yaml` → `schedule:` holds local wall-clock slots (default: Wednesday
-11:30 and Sunday 10:30, `Europe/Amsterdam`), so the posting hour stays put
+`config.yaml` → `schedule:` holds local wall-clock slots (Wednesday 11:30,
+Friday 18:00, Sunday 10:30, `Europe/Amsterdam`), so the posting hour stays put
 across a DST change instead of sliding by one. Each slot drifts by up to
 `jitter_minutes` — deterministic, hashed from the slot itself, so the app and
 the publisher always agree on a time while nothing lands on the same exact
 minute every week. Add or remove entries under `slots:` to change frequency.
+
+## Carousels
+
+Name the files with a trailing letter and they go out as one post:
+
+```
+_DSF1234A.jpg   _DSF1234B.jpg   _DSF1234C.jpg   ->   one carousel, in that order
+```
+
+The rule is a trailing **A–J** on an otherwise identical stem, with at least one
+sibling — so a lone `sunsetA.jpg` stays a single post. The grid shows only the
+first photo with a count badge, exactly as the profile will; the side panel
+shows every frame in order. One caption covers the post, and the drafting call
+is shown all the photos rather than just the first. Meta's limit is 10 per
+carousel and anything past that is dropped.
+
+Publishing is a container per photo (`is_carousel_item`), each polled to
+FINISHED, then a parent container with `media_type=CAROUSEL` that carries the
+caption. A caption on a child is silently discarded, which is the kind of thing
+you only find out from a live post, so there's a test pinning it.
+
+## Reminders
+
+`config.yaml` → `publish.reminders` puts a **Todoist task per upcoming post**,
+due at that post's slot, carrying the caption and links to the images — so
+posting can stay manual without being forgotten. Save rewrites them: reordering
+the queue moves the due dates, and a photo that leaves the window (posted, held,
+pushed back) loses its task, because a reminder to post something already live
+is worse than none. Only the next `reminder_count` posts get one; the queue can
+be a hundred deep.
+
+Needs `TODOIST_API_TOKEN` in `.env`. Whether the task also pushes a notification
+to your phone depends on your Todoist plan — the task is created with
+`auto_reminder`, which plans without reminders ignore; it still lands in Today
+with the time on it.
 
 ## Setup
 
@@ -47,11 +82,14 @@ already-published block.
   **next**. Held photos are skipped and don't consume a slot.
 - Click a photo to write its caption. **It saves as you type** — no Save needed
   for caption edits.
-- A green **+** marks the photo going out next; an orange **!** means a photo
-  still needs attention (no caption, no EXIF date, or too small to fill the
-  frame). A photo can wear both.
-- **Post next photo now** publishes ahead of the schedule (needs Phase 4).
-- **Save** renders, writes `queue.yaml`, commits and pushes.
+- An orange **!** means a photo still needs attention (no caption, no EXIF date,
+  or too small to fill the frame). A plain number is a carousel and says how
+  many photos are in it.
+- **Post next photo now** publishes ahead of the schedule. Select a single photo
+  and it becomes **Post this photo now** and publishes that one instead. Either
+  way the first click is a dry run and a second confirms.
+- **Save** renders, writes `queue.yaml`, commits, pushes, and rewrites the
+  Todoist reminders.
 
 `config.yaml` → `profile:` drives the mock header (username, bio, counts,
 highlights). It is cosmetic; nothing there reaches the Meta API.
@@ -288,6 +326,10 @@ The key: an **API key from [console.anthropic.com](https://console.anthropic.com
 separate from a Claude.ai subscription — three captions with a photo attached
 runs to fractions of a cent. `.env` is git-ignored; the key never goes in
 `config.yaml` or in chat.
+
+A GitHub Actions secret is **not** enough for the curation app: it runs on this
+machine and reads `.env`. Secrets are needed in both places — GitHub for the
+unattended runs, `.env` for anything driven from the app.
 
 Two things are deliberately kept away from the model:
 

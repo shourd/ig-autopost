@@ -114,7 +114,10 @@ function render() {
 
     const mark = warnMark(photo);
     if (mark) cell.append(mark);
-    if (name === nextUp) cell.append(goMark());
+    if (photo.extra?.length) {
+      cell.classList.add("carousel");
+      cell.append(stackMark(photo));
+    }
     grid.append(cell);
   }
 
@@ -145,13 +148,18 @@ function warnMark(photo) {
   return mark;
 }
 
-/* The next photo out gets a green +. It sits where the warning dot sits, and
-   means the opposite thing: this one is going, and nothing is wrong with it. */
-function goMark() {
+/* Grouped by filename: _DSF1234A.jpg + _DSF1234B.jpg are one post. The count
+   is the only way to tell from the grid, since only the first one is shown. */
+function photoFiles(photo) {
+  return [photo.file, ...(photo.extra || [])];
+}
+
+function stackMark(photo) {
+  const count = photoFiles(photo).length;
   const mark = document.createElement("span");
-  mark.className = "mark go";
-  mark.textContent = "+";
-  mark.title = "next to post";
+  mark.className = "mark stack";
+  mark.textContent = String(count);
+  mark.title = `carousel of ${count}`;
   return mark;
 }
 
@@ -202,6 +210,14 @@ function renderPanel() {
   renderQueued(name);
 }
 
+/* The one queued photo currently selected, or null — the target of "Post this
+   photo now". Publishing is irreversible, so the button says which it means. */
+function selectedQueued() {
+  if (selected.length !== 1) return null;
+  const photo = state.photos[selected[0]];
+  return photo && photo.status !== "posted" ? photo.file : null;
+}
+
 function actionsBlock() {
   const wrap = document.createElement("div");
   const nextUp = nextReady();
@@ -213,10 +229,12 @@ function actionsBlock() {
     : "Queue is empty.";
   wrap.append(line);
 
+  const target = selectedQueued();
   const row = document.createElement("div");
   row.className = "row";
   row.append(
-    button("Post next photo now", () => guard(postNow)),
+    button(target ? "Post this photo now" : "Post next photo now",
+      () => guard(() => postNow(target))),
     button("Save", () => guard(save), true),
   );
   wrap.append(row);
@@ -230,11 +248,27 @@ function renderQueued(name) {
   heading.textContent = name;
   const meta = document.createElement("p");
   meta.className = "meta";
+  const files = photoFiles(photo);
   meta.textContent = [
     photo.date ? photo.date.slice(0, 10) : "no EXIF date",
+    files.length > 1 ? `carousel of ${files.length}` : null,
     photo.status === "hold" ? "on hold" : `posts ${formatSlot(state.slots[name])}`,
-  ].join(" · ");
+  ].filter(Boolean).join(" · ");
   panel.append(heading, meta);
+
+  // The grid only ever shows the first photo of a carousel, so the panel is the
+  // one place to check the others and their order.
+  if (files.length > 1) {
+    const strip = document.createElement("div");
+    strip.className = "strip";
+    for (const file of files) {
+      const img = document.createElement("img");
+      img.src = `/img/${encodeURIComponent(file)}`;
+      img.alt = img.title = file;
+      strip.append(img);
+    }
+    panel.append(strip);
+  }
 
   panel.append(label("Caption"));
   const box = document.createElement("textarea");
@@ -425,19 +459,23 @@ async function save() {
    the image and shows exactly what would go out; only the confirm actually
    publishes. Instagram has no unpublish, so a single misclick shouldn't be
    able to put a photo on the profile. */
-async function postNow() {
-  const check = await api("/api/post-now", { method: "POST", body: "{}" });
+async function postNow(file = null) {
+  const check = await api("/api/post-now", {
+    method: "POST",
+    body: JSON.stringify({ file }),
+  });
   if (!check.ok) return toast(check.reason, true);
 
   const warn = (check.warnings || []).map((w) => `\n! ${w}`).join("");
   const caption = check.caption || "(no caption)";
-  if (!confirm(`Publish to Instagram right now?\n\n${check.file}\n${caption}\n${warn}\nThis cannot be undone.`))
+  const what = (check.files || [check.file]).join("\n");
+  if (!confirm(`Publish to Instagram right now?\n\n${what}\n${caption}\n${warn}\nThis cannot be undone.`))
     return toast("Cancelled — nothing was posted.");
 
   toast("Publishing…");
   const result = await api("/api/post-now", {
     method: "POST",
-    body: JSON.stringify({ confirm: true }),
+    body: JSON.stringify({ confirm: true, file }),
   });
   if (result.ok) {
     toast(`Live: ${result.permalink || result.file}`);
@@ -537,8 +575,6 @@ function refreshBadges() {
     const name = cell.dataset.name;
     const when = cell.querySelector(".when");
     cell.classList.toggle("next", name === nextUp);
-    cell.querySelector(".mark.go")?.remove();
-    if (name === nextUp) cell.append(goMark());
     if (!when) continue;
     if (state.photos[name].status === "hold") when.textContent = "on hold";
     else if (name === nextUp) when.textContent = `next · ${shortSlot(state.slots[name])}`;

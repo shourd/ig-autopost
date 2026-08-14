@@ -40,9 +40,17 @@ def _ensure_processed(name: str) -> Path:
         return dst
     result = add_border(src, dst, _state.cfg.border)
     with _lock:
-        photo = _state.photos.get(name)
+        # A carousel's followers have no Photo of their own; the flag belongs to
+        # the post, so it lands on whichever photo leads it.
+        photo = _state.photos.get(name) or next(
+            (p for p in _state.photos.values() if name in p.files), None
+        )
         if photo:
-            photo.upscale_blocked = result.upscale_blocked
+            if photo.file == name:
+                photo.upscale_blocked = result.upscale_blocked
+            else:
+                # One small photo is enough to make the whole carousel awkward.
+                photo.upscale_blocked |= result.upscale_blocked
             _refresh_flags(photo)
             _state.save()
     return dst
@@ -98,10 +106,11 @@ def _draft(names: list[str], force: bool = False) -> list[str]:
         photo = _state.photos.get(name)
         if not photo or (photo.caption_reviewed and not force):
             continue
-        _ensure_processed(name)
+        for member in photo.files:
+            _ensure_processed(member)
         try:
             draft = draft_caption(
-                _state.processed_path(name),
+                [_state.processed_path(f) for f in photo.files],
                 place=photo.place,
                 source_for_date=_state.raw_path(name),
                 cfg=_state.cfg.caption,
@@ -138,9 +147,12 @@ def _save() -> dict:
     log: list[str] = []
     publishable = [p for p in _state.ordered() if p.status != STATUS_POSTED]
 
+    rendered = 0
     for photo in publishable:
-        _ensure_processed(photo.file)
-    log.append(f"rendered {len(publishable)} photo(s)")
+        for name in photo.files:
+            _ensure_processed(name)
+            rendered += 1
+    log.append(f"rendered {rendered} photo(s) in {len(publishable)} post(s)")
 
     # Save never calls the model. Drafting is a suggestion Sjoerd asks for per
     # photo, so pressing Save can't quietly spend money or fill a caption box
@@ -176,13 +188,31 @@ def _save() -> dict:
     if not ok:
         # A missing remote shouldn't look like a failed save — the commit landed.
         log.append(f"push skipped: {out.splitlines()[-1] if out else 'no remote'}")
+        log += _remind()
         return {"ok": True, "log": log, "warning": "committed locally but not pushed"}
     log.append("pushed")
+    log += _remind()
     return {"ok": True, "log": log}
 
 
-def _post_now(confirm: bool) -> dict:
-    """Publish the next queued photo immediately, ahead of its schedule.
+def _remind() -> list[str]:
+    """Rewrite the Todoist reminders. Runs after the push, so the image links in
+    them actually resolve — and never fails the Save."""
+    from src import reminders
+    from src.publish import image_url
+
+    try:
+        log = reminders.sync(_state, image_url)
+    except Exception as exc:  # a Todoist problem is not a Save problem
+        return [f"! reminders failed: {type(exc).__name__}: {exc}"]
+    _state.save()
+    return log
+
+
+def _post_now(confirm: bool, file: str | None = None) -> dict:
+    """Publish a queued post immediately, ahead of its schedule.
+
+    `file` is the photo Sjoerd has selected; without one it's the queue head.
 
     Defaults to a dry run: the button checks that Meta could fetch the image
     and reports what it would post, and only a second explicit click publishes.
@@ -202,7 +232,7 @@ def _post_now(confirm: bool) -> dict:
 
     try:
         with _lock:
-            return publish_next(_state, confirm=confirm)
+            return publish_next(_state, confirm=confirm, file=file)
     except PublishError as exc:
         return {"ok": False, "reason": str(exc)}
 
@@ -241,7 +271,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._file(STATIC / Path(path).name)
             if path.startswith("/img/"):
                 name = Path(path[len("/img/") :]).name
-                if name not in _state.photos:
+                if not _state.known_file(name):
                     return self._json({"error": "unknown photo"}, 404)
                 dst = _ensure_processed(name)
                 return self._send(200, dst.read_bytes(), "image/jpeg")
@@ -316,7 +346,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({**_state.as_json(), "errors": errors})
 
             if path == "/api/post-now":
-                return self._json(_post_now(confirm=bool(body.get("confirm"))))
+                target = body.get("file")
+                return self._json(_post_now(
+                    confirm=bool(body.get("confirm")),
+                    file=Path(target).name if target else None,
+                ))
 
             if path == "/api/save":
                 return self._json(_save())

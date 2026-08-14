@@ -152,25 +152,35 @@ def _validate(text: str, max_chars: int) -> str | None:
     return None
 
 
-def _user_content(image: Path, place: str | None) -> list[dict]:
-    data = base64.standard_b64encode(image.read_bytes()).decode()
+def _user_content(images: list[Path], place: str | None) -> list[dict]:
+    blocks: list[dict] = [
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/jpeg",
+                "data": base64.standard_b64encode(image.read_bytes()).decode(),
+            },
+        }
+        for image in images
+    ]
     if place:
         stated = f"Place: {place}. This is confirmed — you may use this name."
     else:
         stated = (
             "Place: not known. Write captions containing no location of any kind."
         )
-    return [
-        {
-            "type": "image",
-            "source": {"type": "base64", "media_type": "image/jpeg", "data": data},
-        },
-        {"type": "text", "text": stated},
-    ]
+    if len(images) > 1:
+        stated = (
+            f"These {len(images)} photographs are one carousel post, shown in this "
+            f"order. Caption the set, not any single frame.\n{stated}"
+        )
+    blocks.append({"type": "text", "text": stated})
+    return blocks
 
 
 def draft_caption(
-    image: Path | str,
+    image: Path | str | list[Path | str],
     place: str | None = None,
     source_for_date: Path | str | None = None,
     cfg: CaptionConfig | None = None,
@@ -180,10 +190,12 @@ def draft_caption(
 
     `image` should be the processed 1080x1350 JPEG — it is small, already sRGB,
     and is what actually gets posted. The date comes from the raw file, which
-    still has its EXIF.
+    still has its EXIF. Pass a list for a carousel: one caption covers the whole
+    post, so the model is shown every photo in it, in order.
     """
     cfg = cfg or load_config().caption
-    image = Path(image)
+    images = [Path(p) for p in ([image] if isinstance(image, (str, Path)) else image)]
+    image = images[0]
     when, date_source = read_capture_date(source_for_date or image)
 
     flags: list[str] = []
@@ -202,7 +214,7 @@ def draft_caption(
 
         client = anthropic.Anthropic(api_key=secret("ANTHROPIC_API_KEY"))
 
-    messages = [{"role": "user", "content": _user_content(image, place)}]
+    messages = [{"role": "user", "content": _user_content(images, place)}]
     suffix = date_suffix(when)
 
     # Accepted lines survive across attempts, so one bad voice on the retry

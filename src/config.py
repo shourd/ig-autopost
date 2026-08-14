@@ -100,6 +100,8 @@ class PublishConfig:
     poll_attempts: int
     poll_seconds: int
     todoist: bool
+    reminders: bool = False
+    reminder_count: int = 4
 
 
 @dataclass(frozen=True)

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -27,6 +29,30 @@ STATUS_POSTED = "posted"
 # Files that live alongside the backfilled posts but aren't posts themselves.
 RESERVED = {"avatar.jpg"}
 
+# Carousels are declared by filename: _DSF1234A.jpg, _DSF1234B.jpg go out as one
+# post. A trailing letter only groups when at least one sibling shares the stem,
+# so a lone file that happens to end in a letter stays a single post.
+CAROUSEL_SUFFIX = re.compile(r"^(?P<base>.+?)(?P<letter>[A-J])$")
+CAROUSEL_MAX = 10  # Meta's limit on children per carousel
+
+
+def carousel_groups(names: Iterable[str]) -> dict[str, list[str]]:
+    """Map each carousel's lead file to the rest of its photos, in order.
+
+    Files that aren't part of a carousel don't appear at all. The lead is the
+    alphabetically first member, which for A/B/C naming is the A.
+    """
+    buckets: dict[str, list[str]] = {}
+    for name in names:
+        match = CAROUSEL_SUFFIX.fullmatch(Path(name).stem)
+        if match:
+            buckets.setdefault(match["base"], []).append(name)
+    return {
+        members[0]: members[1:CAROUSEL_MAX]
+        for members in (sorted(v) for v in buckets.values())
+        if len(members) > 1
+    }
+
 
 @dataclass
 class Photo:
@@ -43,10 +69,28 @@ class Photo:
     # The three drafted alternatives, keyed by voice. Working state only — the
     # committed queue carries the one caption that was actually chosen.
     caption_options: dict[str, str] = field(default_factory=dict)
+    # The rest of a carousel, if this photo leads one. Derived from filenames on
+    # every rescan, never edited by hand.
+    extra: list[str] = field(default_factory=list)
+    # Todoist task reminding Sjoerd to post this one by hand, if any.
+    reminder_id: str | None = None
+
+    @property
+    def files(self) -> list[str]:
+        """Every photo in this post, in the order Instagram will show them."""
+        return [self.file, *self.extra]
+
+    @property
+    def is_carousel(self) -> bool:
+        return bool(self.extra)
 
     def queue_entry(self) -> dict:
-        """The committed shape, exactly as specified."""
-        return {
+        """The committed shape, exactly as specified.
+
+        A carousel adds `files`; `file` stays the lead so anything reading the
+        queue for a single image still finds one.
+        """
+        entry = {
             "file": self.file,
             "caption": self.caption,
             "caption_reviewed": self.caption_reviewed,
@@ -54,6 +98,9 @@ class Photo:
             "location_id": self.location_id,
             "status": self.status,
         }
+        if self.extra:
+            entry["files"] = self.files
+        return entry
 
 
 class State:
@@ -89,7 +136,11 @@ class State:
             and p.name not in RESERVED  # sidecars, not posts
         ]
         files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-        return [p.name for p in files]
+        names = [p.name for p in files]
+        # A published carousel occupies one square on the profile, so it gets
+        # one cell here too — same rule as the queue above it.
+        followers = {n for members in carousel_groups(names).values() for n in members}
+        return [n for n in names if n not in followers]
 
     def posted_path(self, name: str) -> Path | None:
         """Locate an already-posted image across both folders."""
@@ -183,12 +234,22 @@ class State:
             for p in self.cfg.paths.raw.iterdir()
             if p.suffix.lower() in {".jpg", ".jpeg"} and not p.name.startswith(".")
         }
-        for name in sorted(on_disk - set(self.photos)):
+        # A carousel is one post, so only its lead file gets a Photo; the rest
+        # ride along in `extra`. Recomputed every scan, because renaming a file
+        # is how you change your mind about the grouping.
+        groups = carousel_groups(on_disk)
+        followers = {name for members in groups.values() for name in members}
+        leads = on_disk - followers
+
+        for name in sorted(leads - set(self.photos)):
             self.photos[name] = Photo(file=name)
             self.order.append(name)
-        for name in set(self.photos) - on_disk:
+        for name in set(self.photos) - leads:
             if self.photos[name].status != STATUS_POSTED:
                 del self.photos[name]
+        for name, photo in self.photos.items():
+            if name in leads:
+                photo.extra = groups.get(name, [])
         self.order = [n for n in self.order if n in self.photos]
         self.order += [n for n in self.photos if n not in self.order]
 
@@ -196,6 +257,10 @@ class State:
 
     def ordered(self) -> list[Photo]:
         return [self.photos[n] for n in self.order]
+
+    def known_file(self, name: str) -> bool:
+        """True for any raw file the app is willing to serve, carousels included."""
+        return any(name in photo.files for photo in self.photos.values())
 
     def raw_path(self, name: str) -> Path:
         return self.cfg.paths.raw / name
