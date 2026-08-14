@@ -101,28 +101,52 @@ already-published block.
 - An orange **!** means a photo still needs attention (no caption, no EXIF date,
   or too small to fill the frame). A plain number is a carousel and says how
   many photos are in it.
+- **Remove** takes a photo out of the queue by moving it to `photos/removed/`,
+  not by deleting it — drag it back into `photos/raw/` to undo. A carousel
+  leaves as a unit; half a post isn't a thing.
 - **Post next photo now** publishes ahead of the schedule. Select a single photo
   and it becomes **Post this photo now** and publishes that one instead. Either
   way the first click is a dry run and a second confirms.
 - **Save** renders, writes `queue.yaml`, commits, pushes, and rewrites the
-  Todoist reminders.
+  reminders.
+
+The queue starts in whatever order the folder scan produced. `State.sort_by_date`
+puts it in date order, oldest first, so it drains the way the photos happened —
+in the grid that reads newest at the top-left, exactly like the profile.
 
 `config.yaml` → `profile:` drives the mock header (username, bio, counts,
 highlights). It is cosmetic; nothing there reaches the Meta API.
 
 **Suggest three captions** asks Claude for three drafts of the selected photo —
-one funny, one plain, one a little more poetic — and clicking one puts it in
-the box. Nothing is ever applied by itself, and Save
-never calls the model. Needs `ANTHROPIC_API_KEY` in `.env`; without it the
+one funny, one plain, one a little more poetic — and clicking one puts it in the
+box. Nothing is ever applied by itself, and Save never calls the model. Needs `ANTHROPIC_API_KEY` in `.env`; without it the
 button says so and everything else keeps working. Turn the whole thing off with
 `config.yaml` → `caption.enabled: false`.
 
 Other entry points:
 
 ```bash
-uv run pytest                                    # test suite
-uv run python -m src.border photos/raw/x.jpg     # -> photos/processed/x.jpg
+uv run pytest                                     # test suite
+uv run python -m src.border photos/raw/x.jpg      # -> photos/processed/x.jpg
+uv run python -m src.crop photos/raw/x.jpg 2:3    # centre-crop to an aspect ratio
+uv run python -m src.reminders                    # rewrite the reminders now
+uv run python -m src.history                      # re-download the posted grid
 ```
+
+### Matching margins
+
+The renderer never crops — it fits the whole frame and pads with white — so the
+aspect ratio decides how much white a photo gets. A 2:3 portrait lands with
+107px at the sides; a squarer 4:5 one nearly fills the canvas and reads as
+bigger and pushier next to it. `src.crop` is the fix when that bothers you:
+
+```bash
+uv run python -m src.crop photos/raw/IMG_5666.jpg 2:3
+```
+
+The original is kept in `photos/removed/` as `IMG_5666 (uncropped).jpg`.
+Throwing away pixels is a decision about one photograph, which is why it's a
+command you run and not a rule inside `add_border`.
 
 ## What must be committed
 

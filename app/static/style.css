@@ -286,6 +286,9 @@ button.act {
 }
 button.act:hover { background: #fafafa; }
 button.act.primary { background: var(--link); border-color: var(--link); color: #fff; }
+/* Reversible, so it reads as a warning rather than a danger. */
+button.act.danger { color: var(--warn); }
+button.act.danger:hover { background: #fdf6ec; border-color: var(--warn); }
 button.act.primary:hover { filter: brightness(1.06); }
 button.act:disabled { opacity: .45; cursor: default; }
 

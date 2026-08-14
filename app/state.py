@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -257,6 +258,44 @@ class State:
 
     def ordered(self) -> list[Photo]:
         return [self.photos[n] for n in self.order]
+
+    def remove(self, name: str) -> list[str]:
+        """Take a post out of the queue by moving its photos aside.
+
+        Moved, not deleted: `photos/removed/` is a holding pen, and putting a
+        photo back is a drag into `photos/raw/`. The processed render goes for
+        real, since it is derived and would be rebuilt anyway. A carousel leaves
+        as a unit — its frames are one post, and half a post is not a thing.
+
+        Returns the filenames moved. Raises KeyError if it isn't in the queue.
+        """
+        photo = self.photos[name]
+        self.cfg.paths.removed.mkdir(parents=True, exist_ok=True)
+
+        moved = []
+        for member in photo.files:
+            src = self.raw_path(member)
+            if src.is_file():
+                dst = self.cfg.paths.removed / member
+                # Never clobber something already sitting in the holding pen.
+                if dst.exists():
+                    dst = dst.with_name(f"{dst.stem}-{int(time.time())}{dst.suffix}")
+                src.replace(dst)
+                moved.append(member)
+            self.processed_path(member).unlink(missing_ok=True)
+
+        del self.photos[name]
+        self.order = [n for n in self.order if n != name]
+        self.save()
+        return moved
+
+    def sort_by_date(self) -> None:
+        """Oldest first, so the queue drains in the order the photos happened.
+
+        Undated photos keep to the back rather than being guessed at.
+        """
+        self.order.sort(key=lambda n: (self.photos[n].date is None, self.photos[n].date or "", n))
+        self.save()
 
     def known_file(self, name: str) -> bool:
         """True for any raw file the app is willing to serve, carousels included."""

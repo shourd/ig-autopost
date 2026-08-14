@@ -8,6 +8,10 @@ photos/raw/
 # to a public repo to duplicate what Instagram already serves.
 photos/history/
 
+# Photos taken out of the queue. Kept, not deleted — removing a photo in the
+# app moves it here, so a change of mind is a drag back into photos/raw/.
+photos/removed/
+
 .env
 .venv/
 __pycache__/

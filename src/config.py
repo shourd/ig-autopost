@@ -114,6 +114,7 @@ class Paths:
     posted: Path
     queue: Path
     history: Path
+    removed: Path
 
 
 @dataclass(frozen=True)
@@ -148,6 +149,7 @@ def load_config(path: Path | None = None) -> Config:
             posted=REPO_ROOT / p["posted"],
             queue=REPO_ROOT / p["queue"],
             history=REPO_ROOT / p["history"],
+            removed=REPO_ROOT / p.get("removed", "photos/removed"),
         ),
     )
 

@@ -357,6 +357,14 @@ class Handler(BaseHTTPRequestHandler):
                 errors = _draft(names, force=bool(body.get("files")))
                 return self._json({**_state.as_json(), "errors": errors})
 
+            if path == "/api/remove":
+                name = Path(body["file"]).name
+                with _lock:
+                    if name not in _state.photos:
+                        return self._json({"error": "unknown photo"}, 404)
+                    moved = _state.remove(name)
+                return self._json({**_state.as_json(), "moved": moved})
+
             if path == "/api/post-now":
                 target = body.get("file")
                 return self._json(_post_now(

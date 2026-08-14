@@ -68,6 +68,9 @@ paths:
   processed: photos/processed
   posted: photos/posted
   queue: queue.yaml
+  # Where the app's Remove button puts photos. Nothing reads this folder; it
+  # exists so removing a photo is reversible.
+  removed: photos/removed
   # Backfilled from the Instagram API by `uv run python -m src.history`.
   # Display-only and git-ignored: these are already live on Instagram, so
   # committing ~100 copies would bloat the repo for no publishing benefit.

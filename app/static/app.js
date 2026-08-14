@@ -328,6 +328,7 @@ function renderQueued(name) {
     });
     apply(await api("/api/photos"));
   })));
+  row.append(button("Remove", () => guard(() => remove(name, files)), false, true));
   panel.append(row);
 }
 
@@ -424,12 +425,27 @@ function hintWarn(text) {
   el.classList.add("warn");
   return el;
 }
-function button(text, onClick, primary = false) {
+function button(text, onClick, primary = false, danger = false) {
   const el = document.createElement("button");
-  el.className = `act${primary ? " primary" : ""}`;
+  el.className = `act${primary ? " primary" : ""}${danger ? " danger" : ""}`;
   el.textContent = text;
   el.addEventListener("click", onClick);
   return el;
+}
+
+/* Removing moves the photo to photos/removed/ rather than deleting it, so the
+   confirmation says so — this is an undo away, and shouldn't read like a bomb. */
+async function remove(name, files) {
+  const what = files.length > 1 ? `${files.length} photos:\n${files.join("\n")}` : name;
+  if (!confirm(`Move out of the queue?\n\n${what}\n\nThey go to photos/removed/ — drag them back into photos/raw/ to undo.`))
+    return;
+  const data = await api("/api/remove", {
+    method: "POST",
+    body: JSON.stringify({ file: name }),
+  });
+  selected = [];
+  apply(data);
+  toast(`Moved ${data.moved.length} photo(s) to photos/removed/`);
 }
 
 // --- mutations --------------------------------------------------------------
