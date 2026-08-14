@@ -14,6 +14,7 @@ import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import unquote
 
 import yaml
 
@@ -261,11 +262,21 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(length) or b"{}")
 
+    def _path(self) -> str:
+        """The request path, query stripped and percent-decoding undone.
+
+        Filenames are what goes in these URLs, and a photo called
+        "1090 - 27a.jpg" arrives as "1090%20-%2027a.jpg" — matching that against
+        the filename on disk fails, quietly, as a 404 on an image that is
+        plainly there.
+        """
+        return unquote(self.path.split("?")[0])
+
     # --- routes ------------------------------------------------------------
 
     def do_GET(self) -> None:
         try:
-            path = self.path.split("?")[0]
+            path = self._path()
             if path == "/":
                 return self._file(STATIC / "index.html")
             if path.startswith("/static/"):
@@ -300,7 +311,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         try:
-            path = self.path.split("?")[0]
+            path = self._path()
             body = self._body()
 
             if path == "/api/order":
