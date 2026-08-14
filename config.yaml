@@ -45,7 +45,8 @@ publish:
   # A Todoist task per upcoming post, due at its slot, so posting stays manual
   # but never gets forgotten. Rewritten on every Save.
   reminders: true
-  reminder_count: 4       # only the next few — the queue can be a hundred deep
+  reminder_count: 4         # only the next few — the queue can be a hundred deep
+  reminder_lead_minutes: 120  # the phone buzzes this long before the slot
 
 caption:
   # Suggestions only: the app offers three drafts per photo and never fills the

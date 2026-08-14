@@ -109,8 +109,9 @@ def _draft(names: list[str], force: bool = False) -> list[str]:
         for member in photo.files:
             _ensure_processed(member)
         try:
+            # A carousel is captioned from its lead photo alone.
             draft = draft_caption(
-                [_state.processed_path(f) for f in photo.files],
+                _state.processed_path(name),
                 place=photo.place,
                 source_for_date=_state.raw_path(name),
                 cfg=_state.cfg.caption,

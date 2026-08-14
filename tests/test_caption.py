@@ -34,9 +34,9 @@ def reply(caption=None, *, raw=None, stop_reason="end_turn", **voices):
     break a single voice without having to spell out the other two.
     """
     payload = {
-        "descriptive": "a leopard crossing the road at last light",
-        "plain": caption if caption is not None else "leopard on the track",
-        "poetic": "the light goes, and the leopard goes with it",
+        "funny": "The road belongs to the leopard now",
+        "plain": caption if caption is not None else "Leopard on the track",
+        "poetic": "The light goes, and the leopard goes with it",
         **voices,
     }
     text = raw if raw is not None else json.dumps(payload)
@@ -122,11 +122,11 @@ def test_missing_date_returns_none_not_today(dateless_photo):
     [
         ("", "empty"),
         ("two\nlines", "single line"),
-        ("Sunset on Lamu", "lowercase"),
-        ("sunset on Lamu #travel", "hashtag"),
-        ("what a sunset!", "exclamation"),
-        ("sunset on Lamu ☀", "emoji"),
-        ("sunset on Lamu 2024", "year"),
+        ("sunset on Lamu", "capital"),
+        ("Sunset on Lamu #travel", "hashtag"),
+        ("What a sunset!", "exclamation"),
+        ("Sunset on Lamu ☀", "emoji"),
+        ("Sunset on Lamu 2024", "year"),
         ("a " + "very " * 40 + "long one", "characters"),
     ],
 )
@@ -136,66 +136,71 @@ def test_validate_rejects(text, fragment):
 
 
 def test_validate_accepts_house_style():
-    assert _validate("a leopard crossing the last light", CFG.max_chars) is None
+    assert _validate("A leopard crossing the last light", CFG.max_chars) is None
+
+
+def test_the_capital_rule_only_applies_to_letters():
+    """"3 zebras and a balloon" has no capital to start with, and is fine."""
+    assert _validate("3 zebras and a balloon", CFG.max_chars) is None
 
 
 # --- drafting --------------------------------------------------------------
 
 
 def test_place_is_passed_as_stated_fact(photo):
-    client = FakeClient(reply("sunset on Lamu"))
+    client = FakeClient(reply("Sunset on Lamu"))
 
     draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
 
     assert "Lamu" in client.last_text()
     assert "confirmed" in client.last_text()
-    assert draft.caption == "sunset on Lamu (Jun, 2023)"
+    assert draft.caption == "Sunset on Lamu (Jun, 2023)"
     assert draft.flags == []
 
 
 def test_no_place_instructs_the_model_to_omit_location(photo):
-    client = FakeClient(reply("low cloud coming over the ridge"))
+    client = FakeClient(reply("Low cloud coming over the ridge"))
 
     draft = draft_caption(photo, place=None, cfg=CFG, client=client)
 
     assert "not known" in client.last_text()
     assert "no location" in client.last_text()
-    assert draft.caption == "low cloud coming over the ridge (Jun, 2023)"
+    assert draft.caption == "Low cloud coming over the ridge (Jun, 2023)"
     assert draft.flags == [FLAG_NO_PLACE]
 
 
 def test_missing_date_flags_and_uses_question_marks(dateless_photo):
-    client = FakeClient(reply("light on the water"))
+    client = FakeClient(reply("Light on the water"))
 
     draft = draft_caption(dateless_photo, place="Lamu", cfg=CFG, client=client)
 
-    assert draft.caption == "light on the water (?, ?)"
+    assert draft.caption == "Light on the water (?, ?)"
     assert draft.flags == [FLAG_NO_DATE]
 
 
 def test_three_voices_are_offered_each_with_the_date(photo):
-    client = FakeClient(reply("sunset on Lamu"))
+    client = FakeClient(reply("Sunset on Lamu"))
 
     draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
 
-    assert list(draft.options) == ["descriptive", "plain", "poetic"]
+    assert list(draft.options) == ["funny", "plain", "poetic"]
     assert all(text.endswith(" (Jun, 2023)") for text in draft.options.values())
     # The house voice is the one pre-filled; the others are alternatives.
     assert draft.caption == draft.options["plain"]
 
 
 def test_retries_once_with_the_specific_problem(photo):
-    client = FakeClient(reply("Sunset on Lamu!"), reply("sunset on Lamu"))
+    client = FakeClient(reply("Sunset on Lamu!"), reply("Sunset on Lamu"))
 
     draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
 
     assert len(client.calls) == 2
-    assert draft.caption == "sunset on Lamu (Jun, 2023)"
+    assert draft.caption == "Sunset on Lamu (Jun, 2023)"
     assert draft.ok
     # The retry names the voice and what was wrong with it, rather than just
     # asking again — and doesn't re-litigate the two that were already fine.
     correction = client.calls[1]["messages"][-1]["content"]
-    assert "plain" in correction and "lowercase" in correction
+    assert "plain" in correction and "exclamation" in correction
     assert "poetic" not in correction
 
 
@@ -204,23 +209,23 @@ def test_a_voice_that_never_validates_is_dropped_not_fatal(photo):
 
     draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
 
-    assert list(draft.options) == ["descriptive", "plain"]
+    assert list(draft.options) == ["funny", "plain"]
     assert draft.ok
 
 
 def test_a_good_line_survives_a_bad_retry(photo):
     """First-pass winners are kept; the retry can only add, never take away."""
-    client = FakeClient(reply(poetic="Nope!"), reply(descriptive="Broken!", poetic="quiet light"))
+    client = FakeClient(reply(poetic="Nope!"), reply(funny="Broken!", poetic="Quiet light"))
 
     draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
 
-    assert draft.options["descriptive"] == "a leopard crossing the road at last light (Jun, 2023)"
-    assert draft.options["poetic"] == "quiet light (Jun, 2023)"
+    assert draft.options["funny"] == "The road belongs to the leopard now (Jun, 2023)"
+    assert draft.options["poetic"] == "Quiet light (Jun, 2023)"
 
 
 def test_two_failures_fall_back_to_empty_and_flag(photo):
-    bad = {"descriptive": "Nope!", "plain": "Nope!", "poetic": "Nope!"}
-    worse = {"descriptive": "Still Wrong!", "plain": "Still Wrong!", "poetic": "Still Wrong!"}
+    bad = {"funny": "nope!", "plain": "nope!", "poetic": "nope!"}
+    worse = {"funny": "still wrong!", "plain": "still wrong!", "poetic": "still wrong!"}
     client = FakeClient(reply(**bad), reply(**worse))
 
     draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
@@ -232,11 +237,11 @@ def test_two_failures_fall_back_to_empty_and_flag(photo):
 
 
 def test_malformed_json_is_retried(photo):
-    client = FakeClient(reply(raw="not json at all"), reply("sunset on Lamu"))
+    client = FakeClient(reply(raw="not json at all"), reply("Sunset on Lamu"))
 
     draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
 
-    assert draft.caption == "sunset on Lamu (Jun, 2023)"
+    assert draft.caption == "Sunset on Lamu (Jun, 2023)"
 
 
 def test_refusal_flags_without_retrying(photo):
@@ -249,16 +254,16 @@ def test_refusal_flags_without_retrying(photo):
 
 
 def test_trailing_period_is_stripped(photo):
-    client = FakeClient(reply("sunset on Lamu."))
+    client = FakeClient(reply("Sunset on Lamu."))
 
     draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
 
-    assert draft.caption == "sunset on Lamu (Jun, 2023)"
+    assert draft.caption == "Sunset on Lamu (Jun, 2023)"
 
 
 def test_request_shape(photo):
     """Opus 5 rejects temperature; the schema is what guarantees parseable JSON."""
-    client = FakeClient(reply("sunset on Lamu"))
+    client = FakeClient(reply("Sunset on Lamu"))
 
     draft_caption(photo, place="Lamu", cfg=CFG, client=client)
 
@@ -270,7 +275,7 @@ def test_request_shape(photo):
     # Three named properties rather than an array: structured-output schemas
     # don't support minItems/maxItems, so "exactly three" has to be structural.
     schema = call["output_config"]["format"]["schema"]
-    assert schema["required"] == ["descriptive", "plain", "poetic"]
+    assert schema["required"] == ["funny", "plain", "poetic"]
     assert schema["additionalProperties"] is False
     image = call["messages"][0]["content"][0]
     assert image["type"] == "image"

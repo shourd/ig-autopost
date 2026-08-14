@@ -38,14 +38,8 @@ FLAG_CAPTION_FAILED = "caption_failed"
 
 # Order matters: `plain` is the house voice and becomes the pre-filled default,
 # the other two are alternatives to click. The keys are also the schema keys.
-VOICES = ("descriptive", "plain", "poetic")
+VOICES = ("funny", "plain", "poetic")
 DEFAULT_VOICE = "plain"
-
-VOICE_LABELS = {
-    "descriptive": "descriptive",
-    "plain": "plain",
-    "poetic": "poetic",
-}
 
 SYSTEM_PROMPT = """\
 You write one-line captions for a photography account. Given one photograph, \
@@ -54,11 +48,13 @@ the photographer can pick the one that fits.
 
 The three registers:
 
-- descriptive: concrete and specific about what is actually in the frame. Name \
-the thing, the light, the weather, the hour. Dry humour is welcome when the \
-picture genuinely offers it — an animal caught mid-indignity, a sign saying \
-something absurd — but it must come from the photo, never be bolted on, and \
-never be a joke about the viewer or a pun on the location.
+- funny: genuinely funny, in a dry and understated way. The joke has to come \
+out of what is actually in the frame — an animal caught mid-indignity, a \
+posture that reads as an opinion, a sign saying something absurd, a scale that \
+doesn't make sense. Deadpan beats loud. Never a pun on a place name, never a \
+joke aimed at the viewer, never a meme format, and never a wisecrack bolted \
+onto a photograph that isn't funny: if nothing in the picture is, write \
+something with a light touch rather than forcing it.
 - plain: the house voice. Understated and observational, a plain statement of \
 what is there. No wordplay, no sentiment, no slogan, nothing that sounds like a \
 motivational quote or a stock caption.
@@ -70,10 +66,10 @@ without looking at the photo.
 Rules for all three:
 
 - One line each. Short: the house style runs from about three to ten words.
-- Start with a lowercase letter.
+- Start with a capital letter.
 - No hashtags, no emoji, no exclamation marks, no quotation marks.
 - No date, and no year. Those are added afterwards.
-- Describe what is in the frame. Don't infer the occasion, the photographer's \
+- Stay with what is in the frame. Don't infer the occasion, the photographer's \
 intent, or what anyone in the photo is feeling.
 - Three genuinely different lines. Don't hand back the same caption reworded.
 
@@ -88,9 +84,9 @@ Naming the place is optional even when you have been given one — use it when i
 reads well, leave it out when the picture is about something else.
 
 An example of the target register, for a photo of a leopard at dusk [Masai Mara]:
-  descriptive: a leopard crossing the road at last light
-  plain: leopard on the track, Masai Mara
-  poetic: the light goes, and the leopard goes with it
+  funny: The road belongs to the leopard now
+  plain: Leopard on the track, Masai Mara
+  poetic: The light goes, and the leopard goes with it
 """
 
 CAPTION_SCHEMA = {
@@ -99,7 +95,7 @@ CAPTION_SCHEMA = {
         voice: {
             "type": "string",
             "description": (
-                f"The {voice} caption. One line, lowercase first letter, no "
+                f"The {voice} caption. One line, capital first letter, no "
                 "date, no hashtags, no emoji, no exclamation marks."
             ),
         }
@@ -139,8 +135,8 @@ def _validate(text: str, max_chars: int) -> str | None:
         return "The caption must be a single line with no line breaks."
     if len(text) > max_chars:
         return f"The caption was {len(text)} characters; keep it under {max_chars}."
-    if text[0].isupper():
-        return "The caption must start with a lowercase letter."
+    if text[0].isalpha() and not text[0].isupper():
+        return "The caption must start with a capital letter."
     if "#" in text:
         return "Remove the hashtag. Captions never contain hashtags."
     if "!" in text:
@@ -152,35 +148,25 @@ def _validate(text: str, max_chars: int) -> str | None:
     return None
 
 
-def _user_content(images: list[Path], place: str | None) -> list[dict]:
-    blocks: list[dict] = [
-        {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": "image/jpeg",
-                "data": base64.standard_b64encode(image.read_bytes()).decode(),
-            },
-        }
-        for image in images
-    ]
+def _user_content(image: Path, place: str | None) -> list[dict]:
+    data = base64.standard_b64encode(image.read_bytes()).decode()
     if place:
         stated = f"Place: {place}. This is confirmed — you may use this name."
     else:
         stated = (
             "Place: not known. Write captions containing no location of any kind."
         )
-    if len(images) > 1:
-        stated = (
-            f"These {len(images)} photographs are one carousel post, shown in this "
-            f"order. Caption the set, not any single frame.\n{stated}"
-        )
-    blocks.append({"type": "text", "text": stated})
-    return blocks
+    return [
+        {
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/jpeg", "data": data},
+        },
+        {"type": "text", "text": stated},
+    ]
 
 
 def draft_caption(
-    image: Path | str | list[Path | str],
+    image: Path | str,
     place: str | None = None,
     source_for_date: Path | str | None = None,
     cfg: CaptionConfig | None = None,
@@ -190,12 +176,11 @@ def draft_caption(
 
     `image` should be the processed 1080x1350 JPEG — it is small, already sRGB,
     and is what actually gets posted. The date comes from the raw file, which
-    still has its EXIF. Pass a list for a carousel: one caption covers the whole
-    post, so the model is shown every photo in it, in order.
+    still has its EXIF. A carousel is captioned from its first photo alone: the
+    lead is what stops the scroll, and one image keeps the call cheap.
     """
     cfg = cfg or load_config().caption
-    images = [Path(p) for p in ([image] if isinstance(image, (str, Path)) else image)]
-    image = images[0]
+    image = Path(image)
     when, date_source = read_capture_date(source_for_date or image)
 
     flags: list[str] = []
@@ -214,7 +199,7 @@ def draft_caption(
 
         client = anthropic.Anthropic(api_key=secret("ANTHROPIC_API_KEY"))
 
-    messages = [{"role": "user", "content": _user_content(images, place)}]
+    messages = [{"role": "user", "content": _user_content(image, place)}]
     suffix = date_suffix(when)
 
     # Accepted lines survive across attempts, so one bad voice on the retry

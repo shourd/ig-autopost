@@ -102,6 +102,7 @@ class PublishConfig:
     todoist: bool
     reminders: bool = False
     reminder_count: int = 4
+    reminder_lead_minutes: int = 120
 
 
 @dataclass(frozen=True)

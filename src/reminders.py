@@ -16,6 +16,7 @@ Nothing here is ever allowed to raise. A Todoist outage must not stop a Save.
 from __future__ import annotations
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import requests
 from requests import RequestException
@@ -23,6 +24,7 @@ from requests import RequestException
 from src.config import secret
 
 API = "https://api.todoist.com/api/v1/tasks"
+ALARMS = "https://api.todoist.com/api/v1/reminders"
 TIMEOUT = 30
 
 
@@ -30,9 +32,12 @@ def _headers(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _body(photo, when: datetime, urls: list[str]) -> dict:
+def _body(photo, when: datetime, urls: list[str], tz: ZoneInfo) -> dict:
     caption = photo.caption.strip() or "(no caption yet)"
-    lines = [caption, ""]
+    # The notification arrives ahead of the slot, so the slot has to be written
+    # down — in local time, which is the only one worth reading on a phone.
+    local = when.astimezone(tz).strftime("%a %-d %b, %H:%M")
+    lines = [f"Post at {local}.", "", caption, ""]
     lines += urls
     if photo.is_carousel:
         lines.append(f"\nCarousel of {len(photo.files)}, in this order.")
@@ -42,10 +47,56 @@ def _body(photo, when: datetime, urls: list[str]) -> dict:
         "content": f"Post {photo.file} to Instagram",
         "description": "\n".join(lines),
         "due_datetime": when.isoformat(),
-        # Todoist's own notification for a timed task. Ignored on plans without
-        # reminders; the task still lands in Today with the time on it.
-        "auto_reminder": True,
+        # The push comes from an explicit reminder set `reminder_lead_minutes`
+        # ahead (see `_alarm`), not from Todoist's default one at the due time.
+        "auto_reminder": False,
     }
+
+
+def _alarm(token: str, task_id: str, lead: int) -> str | None:
+    """Ensure a push reminder sits `lead` minutes before the task's due time.
+
+    Relative reminders track the due date, so this only has to be created once —
+    reordering the queue moves the task and the reminder follows. Existing ones
+    are looked up rather than tracked in state, which keeps the app honest if a
+    reminder is deleted in Todoist.
+
+    Returns a log line on failure, None on success. Todoist reminders need a
+    paid plan; on a free one this is the call that says so.
+    """
+    if lead <= 0:
+        return None
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        resp = requests.get(
+            ALARMS, headers=headers, params={"task_id": task_id}, timeout=TIMEOUT
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+        existing = payload.get("results", []) if isinstance(payload, dict) else payload
+        if any(alarm.get("minute_offset") == lead for alarm in existing):
+            return None
+
+        resp = requests.post(
+            ALARMS,
+            headers=headers,
+            json={
+                "task_id": task_id,
+                "reminder_type": "relative",
+                "minute_offset": lead,
+                "service": "push",
+            },
+            timeout=TIMEOUT,
+        )
+        if resp.status_code in (402, 403):
+            return (
+                "! phone reminders need a paid Todoist plan — the tasks are there "
+                "with their times, but Todoist won't push a notification"
+            )
+        resp.raise_for_status()
+    except (RequestException, ValueError) as exc:
+        return f"! reminder alarm failed: {exc}"
+    return None
 
 
 def sync(state, image_url) -> list[str]:
@@ -73,7 +124,7 @@ def sync(state, image_url) -> list[str]:
 
     for photo, when in zip(upcoming, slots):
         urls = [image_url(state.processed_path(f).name, cfg) for f in photo.files]
-        body = _body(photo, when, urls)
+        body = _body(photo, when, urls, ZoneInfo(cfg.schedule.timezone))
         try:
             if photo.reminder_id:
                 resp = requests.post(
@@ -94,6 +145,11 @@ def sync(state, image_url) -> list[str]:
                 created += 1
         except (RequestException, KeyError, ValueError) as exc:
             log.append(f"! reminder for {photo.file} failed: {exc}")
+            continue
+
+        problem = _alarm(token, photo.reminder_id, cfg.publish.reminder_lead_minutes)
+        if problem and problem not in log:  # one plan warning is plenty
+            log.append(problem)
 
     # Anything no longer in the window — posted, held, pushed down the queue —
     # loses its task, so Todoist never says "post this" about a live post.
@@ -112,6 +168,7 @@ def sync(state, image_url) -> list[str]:
             log.append(f"! clearing reminder for {photo.file} failed: {exc}")
         photo.reminder_id = None
 
+    lead = cfg.publish.reminder_lead_minutes
     parts = [f"{created} new", f"{updated} updated", f"{removed} cleared"]
-    log.insert(0, f"reminders: {', '.join(parts)}")
+    log.insert(0, f"reminders: {', '.join(parts)} ({lead} min before posting)")
     return log

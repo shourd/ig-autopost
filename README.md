@@ -28,8 +28,8 @@ _DSF1234A.jpg   _DSF1234B.jpg   _DSF1234C.jpg   ->   one carousel, in that order
 The rule is a trailing **A–J** on an otherwise identical stem, with at least one
 sibling — so a lone `sunsetA.jpg` stays a single post. The grid shows only the
 first photo with a count badge, exactly as the profile will; the side panel
-shows every frame in order. One caption covers the post, and the drafting call
-is shown all the photos rather than just the first. Meta's limit is 10 per
+shows every frame in order. One caption covers the post, drafted from the lead
+photo alone — it's the one that stops the scroll. Meta's limit is 10 per
 carousel and anything past that is dropped.
 
 Publishing is a container per photo (`is_carousel_item`), each polled to
@@ -47,10 +47,14 @@ pushed back) loses its task, because a reminder to post something already live
 is worse than none. Only the next `reminder_count` posts get one; the queue can
 be a hundred deep.
 
-Needs `TODOIST_API_TOKEN` in `.env`. Whether the task also pushes a notification
-to your phone depends on your Todoist plan — the task is created with
-`auto_reminder`, which plans without reminders ignore; it still lands in Today
-with the time on it.
+Each task also gets a push reminder `reminder_lead_minutes` (default 120) before
+the slot, and its description opens with the posting time in local terms, since
+the notification arrives well before the moment it's talking about.
+
+Needs `TODOIST_API_TOKEN` in `.env`. **The push itself needs a paid Todoist
+plan** — the reminders endpoint answers `403 PREMIUM_ONLY` on a free account.
+The tasks are still created, with their due times, and still show up in Today;
+they just don't buzz on their own.
 
 ## Setup
 
@@ -95,8 +99,8 @@ already-published block.
 highlights). It is cosmetic; nothing there reaches the Meta API.
 
 **Suggest three captions** asks Claude for three drafts of the selected photo —
-one descriptive (dry humour allowed), one plain, one a little more poetic — and
-clicking one puts it in the box. Nothing is ever applied by itself, and Save
+one funny, one plain, one a little more poetic — and clicking one puts it in
+the box. Nothing is ever applied by itself, and Save
 never calls the model. Needs `ANTHROPIC_API_KEY` in `.env`; without it the
 button says so and everything else keeps working. Turn the whole thing off with
 `config.yaml` → `caption.enabled: false`.
@@ -312,10 +316,10 @@ aspect floor, which is why `border.py` asserts that size.
 ## Captions
 
 `claude-opus-5` with vision, constrained by a JSON schema to exactly three
-captions — `{"descriptive": ..., "plain": ..., "poetic": ...}`. Three named
+captions — `{"funny": ..., "plain": ..., "poetic": ...}`. Three named
 properties rather than an array because structured-output schemas don't support
 `minItems`/`maxItems`, so "exactly three" has to be structural. Each is checked
-against house style (one line, lowercase first letter, no hashtag, emoji,
+against house style (one line, capital first letter, no hashtag, emoji,
 exclamation mark, or year); a voice that fails gets one retry naming the
 problem, and is dropped if it fails again rather than dragging the other two
 down with it.
@@ -333,7 +337,7 @@ unattended runs, `.env` for anything driven from the app.
 
 Two things are deliberately kept away from the model:
 
-- **The date.** It returns only the descriptive clause; Python appends
+- **The date.** It returns only the caption clause; Python appends
   `" (Mon, YYYY)"`. The month comes from a hardcoded English list — this machine's
   locale is Dutch and `strftime("%b")` returns `mrt`, which a test proves.
 - **The place.** Resolved beforehand from the app's batch label and passed in as
