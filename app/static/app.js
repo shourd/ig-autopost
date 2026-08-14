@@ -302,6 +302,17 @@ function renderQueued(name) {
 
   if (state.caption_enabled) panel.append(suggestions(name, box, showStatus));
 
+  // A lettered filename with nothing to pair with is almost always a carousel
+  // that didn't take: the part before the letter has to match exactly.
+  const lettered = name.match(/^(.*)([A-J])(\.jpe?g)$/i);
+  if (files.length === 1 && lettered) {
+    const [, base, , ext] = lettered;
+    panel.append(hintWarn(
+      `Not a carousel: nothing else is named ${base}?${ext}. The name before the ` +
+      `letter must be identical — ${base}A${ext}, ${base}B${ext}.`,
+    ));
+  }
+
   for (const flag of photo.flags || []) {
     if (flag === "no_date") panel.append(hintWarn("No EXIF date — caption date reads “(?, ?)”."));
     if (flag === "too_small") panel.append(hintWarn("Smaller than 1028×1298 — not upscaled, margins run wide."));

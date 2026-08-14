@@ -153,12 +153,22 @@ def secret(name: str, required: bool = True) -> str | None:
     """Read a secret from the environment, loading .env first if present.
 
     CI sets these directly in the environment; locally they come from .env.
+
+    .env wins over a blank environment variable, which is the whole point: the
+    template ships every name with an empty value, so a long-running app that
+    read .env before a key was filled in would otherwise cache the blank forever
+    and keep reporting the secret as missing after it had been set.
     """
     env_file = REPO_ROOT / ".env"
     if env_file.exists():
-        from dotenv import load_dotenv
+        from dotenv import dotenv_values, load_dotenv
 
         load_dotenv(env_file)
+        if not os.environ.get(name):
+            os.environ.pop(name, None)
+            from_file = dotenv_values(env_file).get(name)
+            if from_file:
+                os.environ[name] = from_file
     value = os.environ.get(name)
     if required and not value:
         raise RuntimeError(
