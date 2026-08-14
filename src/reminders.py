@@ -43,8 +43,11 @@ def _body(photo, when: datetime, urls: list[str], tz: ZoneInfo) -> dict:
         lines.append(f"\nCarousel of {len(photo.files)}, in this order.")
     if not photo.caption.strip():
         lines.append("\nNo caption written yet.")
+    from src.apple_reminders import title_for
+
     return {
-        "content": f"Post {photo.file} to Instagram",
+        # One title for both channels, so the Reminders sweep recognises its own.
+        "content": title_for(photo.file),
         "description": "\n".join(lines),
         "due_datetime": when.isoformat(),
         # The push comes from an explicit reminder set `reminder_lead_minutes`

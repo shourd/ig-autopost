@@ -30,6 +30,16 @@ TIMEOUT = 30
 NOT_AUTHORISED = "-1743"
 WAITING = "permission dialog unanswered"
 
+# Every reminder this module writes is titled "Post <file> to Instagram", which
+# is also how it recognises its own on the way back in. `src.reminders` builds
+# the titles; these two have to keep agreeing with it.
+TITLE_PREFIX = "Post "
+TITLE_SUFFIX = " to Instagram"
+
+
+def title_for(filename: str) -> str:
+    return f"{TITLE_PREFIX}{filename}{TITLE_SUFFIX}"
+
 
 @dataclass(frozen=True)
 class Nudge:
@@ -63,13 +73,20 @@ def _script(nudges: list[Nudge], list_name: str | None) -> str:
     else:
         lines.append("\tset theList to default list")
 
+    # Sweep every reminder this app has ever made before writing the current
+    # ones. Deleting only the titles being rewritten would strand the rest: a
+    # photo dropped from the queue — or a whole queue thrown away — would keep
+    # buzzing about a file that no longer exists. The pattern is this module's
+    # own title template, so nothing hand-written can match it.
+    lines.append(
+        f'\tdelete (every reminder of theList whose completed is false '
+        f'and name starts with "{TITLE_PREFIX}" and name ends with "{TITLE_SUFFIX}")'
+    )
+
     for nudge in nudges:
         title = _quote(nudge.title)
         stamp = int(nudge.when.replace(tzinfo=nudge.when.tzinfo or timezone.utc).timestamp())
         lines += [
-            # Rewritten, not updated: the schedule moves whenever the queue does.
-            f'\tdelete (every reminder of theList whose name is "{title}" '
-            "and completed is false)",
             f"\tset theDate to epochStart + {stamp}",
             f'\tmake new reminder at end of theList with properties '
             f'{{name:"{title}", body:"{_quote(nudge.body)}", remind me date:theDate}}',
@@ -94,9 +111,11 @@ def _run(script: str) -> tuple[bool, str]:
 
 
 def sync(nudges: list[Nudge], list_name: str | None = None, run=_run) -> list[str]:
-    """Put each nudge in the Reminders app. Returns log lines."""
-    if not nudges:
-        return []
+    """Put each nudge in the Reminders app. Returns log lines.
+
+    An empty list is not a no-op: it sweeps, which is how an emptied queue stops
+    reminding anyone to post photos that aren't there any more.
+    """
     if sys.platform != "darwin":
         return ["! Apple Reminders skipped (not macOS)"]
 
@@ -104,6 +123,7 @@ def sync(nudges: list[Nudge], list_name: str | None = None, run=_run) -> list[st
     if ok:
         where = f'"{list_name}"' if list_name else "the default list"
         return [f"Apple Reminders: {len(nudges)} in {where}"]
+
     if WAITING in output:
         return [
             "! Apple Reminders: macOS is asking permission to control Reminders — "

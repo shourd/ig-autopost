@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from src.apple_reminders import Nudge, _script, sync
+from types import SimpleNamespace
+from zoneinfo import ZoneInfo
+
+from src.apple_reminders import Nudge, _script, sync, title_for
 
 WHEN = datetime(2026, 8, 19, 9, 52, tzinfo=timezone.utc)
 NUDGE = Nudge(title="Post a.jpg to Instagram", body="Post at Wed 19 Aug, 11:52.", when=WHEN)
@@ -23,14 +26,22 @@ def test_the_time_is_built_from_a_timestamp_not_a_date_string():
     assert "remind me date:theDate" in script
 
 
-def test_an_existing_reminder_is_replaced_not_duplicated():
+def test_every_reminder_this_app_made_is_swept_before_writing():
+    """A photo dropped from the queue must stop buzzing, not just get rewritten."""
     script = _script([NUDGE], None)
 
     assert (
-        'delete (every reminder of theList whose name is "Post a.jpg to Instagram" '
-        "and completed is false)"
+        'delete (every reminder of theList whose completed is false '
+        'and name starts with "Post " and name ends with " to Instagram")'
     ) in script
     assert script.index("delete (every reminder") < script.index("make new reminder")
+
+
+def test_an_empty_queue_still_sweeps():
+    script = _script([], None)
+
+    assert "delete (every reminder" in script
+    assert "make new reminder" not in script
 
 
 def test_the_default_list_is_used_when_none_is_named():
@@ -96,8 +107,17 @@ def test_success_names_the_list():
     assert log == ['Apple Reminders: 1 in "Instagram"']
 
 
-def test_nothing_to_do_makes_no_call():
-    def explode(_script):
-        raise AssertionError("osascript should not run for an empty queue")
+def test_an_emptied_queue_reports_the_sweep():
+    log = sync([], None, run=lambda _s: (True, ""))
 
-    assert sync([], None, run=explode) == []
+    assert log == ["Apple Reminders: 0 in the default list"]
+
+
+def test_the_title_template_is_shared_with_the_todoist_task():
+    """The sweep recognises its own reminders by title; one template, two users."""
+    from src.reminders import _body
+
+    task = _body(SimpleNamespace(file="a.jpg", caption="x", is_carousel=False, files=["a.jpg"]),
+                 WHEN, [], ZoneInfo("Europe/Amsterdam"))
+
+    assert task["content"] == title_for("a.jpg")
