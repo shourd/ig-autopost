@@ -25,6 +25,13 @@ schedule:
   weekday: 0              # 0 = Monday, matching the GitHub Actions cron
   hour_utc: 8
 
+publish:
+  api_version: v26.0      # pinned; Meta retires versions on a ~2-year clock
+  branch: main            # the branch raw.githubusercontent.com serves from
+  poll_attempts: 20       # container processing is usually <5s, allow ~60s
+  poll_seconds: 3
+  todoist: true           # a "post is live" task; failure never rolls back a post
+
 caption:
   # Auto-drafting is switched off — Sjoerd writes captions by hand. The module
   # and its tests stay in the tree; flip `enabled` back to true to re-arm it.
@@ -39,3 +46,7 @@ paths:
   processed: photos/processed
   posted: photos/posted
   queue: queue.yaml
+  # Backfilled from the Instagram API by `uv run python -m src.history`.
+  # Display-only and git-ignored: these are already live on Instagram, so
+  # committing ~100 copies would bloat the repo for no publishing benefit.
+  history: photos/history

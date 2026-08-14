@@ -66,11 +66,21 @@ class ScheduleConfig:
 
 
 @dataclass(frozen=True)
+class PublishConfig:
+    api_version: str
+    branch: str
+    poll_attempts: int
+    poll_seconds: int
+    todoist: bool
+
+
+@dataclass(frozen=True)
 class Paths:
     raw: Path
     processed: Path
     posted: Path
     queue: Path
+    history: Path
 
 
 @dataclass(frozen=True)
@@ -79,6 +89,7 @@ class Config:
     caption: CaptionConfig
     profile: ProfileConfig
     schedule: ScheduleConfig
+    publish: PublishConfig
     paths: Paths
 
 
@@ -97,11 +108,13 @@ def load_config(path: Path | None = None) -> Config:
         caption=CaptionConfig(**raw["caption"]),
         profile=ProfileConfig(**raw["profile"]),
         schedule=ScheduleConfig(**raw["schedule"]),
+        publish=PublishConfig(**raw["publish"]),
         paths=Paths(
             raw=REPO_ROOT / p["raw"],
             processed=REPO_ROOT / p["processed"],
             posted=REPO_ROOT / p["posted"],
             queue=REPO_ROOT / p["queue"],
+            history=REPO_ROOT / p["history"],
         ),
     )
 

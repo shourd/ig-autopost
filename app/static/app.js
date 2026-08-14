@@ -353,10 +353,26 @@ async function save() {
   apply(await api("/api/photos"));
 }
 
+/* Two clicks, deliberately. The first is a dry run that proves Meta can fetch
+   the image and shows exactly what would go out; only the confirm actually
+   publishes. Instagram has no unpublish, so a single misclick shouldn't be
+   able to put a photo on the profile. */
 async function postNow() {
-  const result = await api("/api/post-now", { method: "POST", body: "{}" });
+  const check = await api("/api/post-now", { method: "POST", body: "{}" });
+  if (!check.ok) return toast(check.reason, true);
+
+  const warn = (check.warnings || []).map((w) => `\n! ${w}`).join("");
+  const caption = check.caption || "(no caption)";
+  if (!confirm(`Publish to Instagram right now?\n\n${check.file}\n${caption}\n${warn}\nThis cannot be undone.`))
+    return toast("Cancelled — nothing was posted.");
+
+  toast("Publishing…");
+  const result = await api("/api/post-now", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true }),
+  });
   if (result.ok) {
-    toast(result.message || "Posted.");
+    toast(`Live: ${result.permalink || result.file}`);
     apply(await api("/api/photos"));
   } else {
     toast(result.reason, true);

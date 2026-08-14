@@ -22,6 +22,9 @@ STATUS_READY = "ready"
 STATUS_HOLD = "hold"
 STATUS_POSTED = "posted"
 
+# Files that live alongside the backfilled posts but aren't posts themselves.
+RESERVED = {"avatar.jpg"}
+
 
 @dataclass
 class Photo:
@@ -60,20 +63,36 @@ class State:
     # --- already-published grid --------------------------------------------
 
     def posted(self) -> list[str]:
-        """Filenames in photos/posted/, newest first — Instagram's grid order.
+        """Everything already live on Instagram, newest first — grid order.
 
-        Populated by the publisher as posts go out. To see the queue against
-        the real profile, drop existing exports in there too.
+        Two sources, deliberately kept apart on disk but merged here:
+        photos/posted/ is what this pipeline published (committed, because the
+        publisher's move is a git diff), photos/history/ is the backfill from
+        the API (git-ignored, display-only). The grid doesn't care which is
+        which — both are simply "already posted".
+
+        Ordering is by mtime, which `src.history` stamps to each post's real
+        publish time so the backfilled grid matches Instagram's own.
         """
-        folder = self.cfg.paths.posted
-        if not folder.is_dir():
-            return []
         files = [
-            p for p in folder.iterdir()
-            if p.suffix.lower() in {".jpg", ".jpeg"} and not p.name.startswith(".")
+            p
+            for folder in (self.cfg.paths.posted, self.cfg.paths.history)
+            if folder.is_dir()
+            for p in folder.iterdir()
+            if p.suffix.lower() in {".jpg", ".jpeg"}
+            and not p.name.startswith(".")
+            and p.name not in RESERVED  # sidecars, not posts
         ]
         files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         return [p.name for p in files]
+
+    def posted_path(self, name: str) -> Path | None:
+        """Locate an already-posted image across both folders."""
+        for folder in (self.cfg.paths.posted, self.cfg.paths.history):
+            candidate = folder / name
+            if candidate.is_file():
+                return candidate
+        return None
 
     # --- posting schedule --------------------------------------------------
 
@@ -155,19 +174,41 @@ class State:
 
         posted = self.posted()
         p = self.cfg.profile
+        # The API is authoritative when src.history has run; config.yaml is the
+        # fallback for a fresh clone with no token. Typed-in values describe
+        # whichever account someone screenshotted, which is how this header
+        # spent a while showing the wrong profile entirely.
+        live = self.live_profile()
         return {
             "order": self.order,
             "photos": {k: asdict(v) for k, v in self.photos.items()},
             "posted": posted,
             "slots": slots,
             "profile": {
-                "username": p.username,
-                "display_name": p.display_name,
-                "bio": p.bio,
-                "posts": p.posts if p.posts is not None else len(posted),
-                "followers": p.followers,
-                "following": p.following,
+                "username": live.get("username", p.username),
+                "display_name": live.get("name", p.display_name),
+                "bio": live.get("biography", p.bio),
+                "posts": live.get("media_count", p.posts if p.posts is not None else len(posted)),
+                "followers": live.get("followers_count", p.followers),
+                "following": live.get("follows_count", p.following),
                 "highlights": p.highlights,
-                "has_avatar": bool(p.avatar),
+                "has_avatar": bool(live.get("avatar") or p.avatar),
+                "live": bool(live),
             },
         }
+
+    def live_profile(self) -> dict:
+        """Profile cached by `src.history`, or {} if it has never run."""
+        cached = self.cfg.paths.history / "profile.yaml"
+        if not cached.is_file():
+            return {}
+        return yaml.safe_load(cached.read_text()) or {}
+
+    def avatar_path(self) -> Path | None:
+        for candidate in (
+            self.cfg.paths.history / "avatar.jpg",
+            (REPO_ROOT / self.cfg.profile.avatar) if self.cfg.profile.avatar else None,
+        ):
+            if candidate and candidate.is_file():
+                return candidate
+        return None

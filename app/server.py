@@ -20,7 +20,7 @@ import yaml
 from app.state import STATUS_HOLD, STATUS_POSTED, STATUS_READY, State
 from src.border import add_border
 from src.caption import draft_caption
-from src.config import REPO_ROOT
+from src.config import REPO_ROOT, secret
 
 STATIC = Path(__file__).parent / "static"
 MIME = {".html": "text/html", ".js": "text/javascript", ".css": "text/css"}
@@ -177,38 +177,30 @@ def _save() -> dict:
     return {"ok": True, "log": log}
 
 
-def _post_now() -> dict:
-    """Publish the next queued photo immediately, ahead of its cron slot.
+def _post_now(confirm: bool) -> dict:
+    """Publish the next queued photo immediately, ahead of its schedule.
 
-    Phase 4 isn't built yet, so this reports exactly what's missing rather than
-    faking a success. Once src/publish.py lands it calls straight into it.
+    Defaults to a dry run: the button checks that Meta could fetch the image
+    and reports what it would post, and only a second explicit click publishes.
+    Publishing is irreversible from here — the API has no unpublish.
     """
-    from src.config import secret
+    from src.publish import PublishError, publish_next
 
-    nxt = next((p for p in _state.ordered() if p.status == STATUS_READY), None)
-    if nxt is None:
-        return {"ok": False, "reason": "Queue is empty — nothing to post."}
-
-    if not (REPO_ROOT / "src" / "publish.py").is_file():
-        missing = [
-            name
-            for name in ("IG_USER_ID", "META_ACCESS_TOKEN", "META_APP_ID", "META_APP_SECRET")
-            if not secret(name, required=False)
-        ]
+    missing = [
+        name for name in ("IG_USER_ID", "META_ACCESS_TOKEN")
+        if not secret(name, required=False)
+    ]
+    if missing:
         return {
             "ok": False,
-            "file": nxt.file,
-            "reason": (
-                f"Would post {nxt.file}, but publishing isn't built yet.\n"
-                "Phase 4 is gated on the Meta app being live with a working token.\n"
-                + (f"Not set yet: {', '.join(missing)}" if missing else "Secrets are set.")
-                + "\nSee README → Enabling auto-posting."
-            ),
+            "reason": f"Not set yet: {', '.join(missing)}. See README → Enabling auto-posting.",
         }
 
-    from src.publish import publish_next  # noqa: PLC0415 — only exists in Phase 4
-
-    return publish_next(_state)
+    try:
+        with _lock:
+            return publish_next(_state, confirm=confirm)
+    except PublishError as exc:
+        return {"ok": False, "reason": str(exc)}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -251,14 +243,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, dst.read_bytes(), "image/jpeg")
             if path.startswith("/posted/"):
                 name = Path(path[len("/posted/") :]).name
-                src = _state.cfg.paths.posted / name
-                if not src.is_file():
+                src = _state.posted_path(name)
+                if src is None:
                     return self._json({"error": "unknown photo"}, 404)
                 return self._send(200, src.read_bytes(), "image/jpeg")
             if path == "/avatar":
-                avatar = _state.cfg.profile.avatar
-                src = (REPO_ROOT / avatar) if avatar else None
-                if not src or not src.is_file():
+                src = _state.avatar_path()
+                if src is None:
                     return self._json({"error": "no avatar configured"}, 404)
                 return self._send(200, src.read_bytes(), "image/jpeg")
             if path == "/api/photos":
@@ -322,7 +313,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({**_state.as_json(), "errors": errors})
 
             if path == "/api/post-now":
-                return self._json(_post_now())
+                return self._json(_post_now(confirm=bool(body.get("confirm"))))
 
             if path == "/api/save":
                 return self._json(_save())

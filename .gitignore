@@ -3,6 +3,11 @@
 # The GitHub Actions runner uploads photos/processed/<file>, so it must be in git.
 photos/raw/
 
+# Backfilled copies of posts already live on Instagram. Display-only: the
+# publisher never reads these, so committing ~100 of them would add megabytes
+# to a public repo to duplicate what Instagram already serves.
+photos/history/
+
 .env
 .venv/
 __pycache__/
