@@ -6,7 +6,9 @@
 
 const FLAG_LABELS = { no_date: "no date", too_small: "small", caption_failed: "no caption" };
 
-let state = { order: [], photos: {}, posted: [], slots: {}, profile: null };
+let state = {
+  order: [], photos: {}, posted: [], slots: {}, profile: null, caption_enabled: false,
+};
 let selected = [];
 let lastAnchor = null;
 let dragName = null;
@@ -15,8 +17,11 @@ const $ = (sel) => document.querySelector(sel);
 const grid = $("#grid");
 const panel = $("#panel");
 
-// Queue in display order: reverse of posting order.
-const displayQueue = () => [...state.order].reverse();
+/* Queue in display order: reverse of posting order. Already-published photos
+   drop out — they stay in `order` so the publisher's history is intact, but
+   they're drawn once, in the posted block below, not twice. */
+const displayQueue = () =>
+  [...state.order].reverse().filter((n) => state.photos[n]?.status !== "posted");
 // The photo the publisher will actually pick up next.
 const nextReady = () => state.order.find((n) => state.photos[n]?.status === "ready");
 
@@ -109,6 +114,7 @@ function render() {
 
     const mark = warnMark(photo);
     if (mark) cell.append(mark);
+    if (name === nextUp) cell.append(goMark());
     grid.append(cell);
   }
 
@@ -136,6 +142,16 @@ function warnMark(photo) {
   mark.title = warnings.length
     ? warnings.map((f) => FLAG_LABELS[f]).join(", ")
     : "no caption";
+  return mark;
+}
+
+/* The next photo out gets a green +. It sits where the warning dot sits, and
+   means the opposite thing: this one is going, and nothing is wrong with it. */
+function goMark() {
+  const mark = document.createElement("span");
+  mark.className = "mark go";
+  mark.textContent = "+";
+  mark.title = "next to post";
   return mark;
 }
 
@@ -250,6 +266,8 @@ function renderQueued(name) {
   showStatus();
   panel.append(box, status);
 
+  if (state.caption_enabled) panel.append(suggestions(name, box, showStatus));
+
   for (const flag of photo.flags || []) {
     if (flag === "no_date") panel.append(hintWarn("No EXIF date — caption date reads “(?, ?)”."));
     if (flag === "too_small") panel.append(hintWarn("Smaller than 1028×1298 — not upscaled, margins run wide."));
@@ -266,6 +284,56 @@ function renderQueued(name) {
     apply(await api("/api/photos"));
   })));
   panel.append(row);
+}
+
+/* Three drafted lines, offered and never applied on their own. Clicking one
+   fills the box and counts as review, exactly like typing would. */
+function suggestions(name, box, showStatus) {
+  const photo = state.photos[name];
+  const options = Object.entries(photo.caption_options || {});
+  const wrap = document.createElement("div");
+  wrap.append(label("Suggestions"));
+
+  const list = document.createElement("div");
+  list.className = "options";
+  for (const [voice, text] of options) {
+    const el = document.createElement("button");
+    el.className = `option${text === box.value ? " on" : ""}`;
+    const tag = document.createElement("b");
+    tag.textContent = voice;
+    el.append(tag, document.createTextNode(text));
+    el.addEventListener("click", () => {
+      box.value = text;
+      box.classList.remove("draft");
+      photo.caption = text;
+      photo.caption_reviewed = true;
+      syncWarn(name);
+      for (const other of list.children) other.classList.toggle("on", other === el);
+      showStatus("Saving…");
+      queueSave(name, { caption: text }, () => showStatus("Saved.", "ok"));
+    });
+    list.append(el);
+  }
+  wrap.append(options.length ? list : hint("Nothing drafted for this photo yet."));
+
+  const row = document.createElement("div");
+  row.className = "row";
+  row.append(button(options.length ? "Suggest three more" : "Suggest three captions",
+    () => guard(() => suggest(name))));
+  wrap.append(row);
+  return wrap;
+}
+
+async function suggest(name) {
+  toast("Asking Claude…");
+  const data = await api("/api/draft", {
+    method: "POST",
+    body: JSON.stringify({ files: [name] }),
+  });
+  const errors = data.errors || [];
+  apply(data);
+  if (errors.length) toast(errors.join("\n"), true);
+  else toast("Three suggestions ready — click one to use it.");
 }
 
 function renderPosted(name) {
@@ -469,6 +537,8 @@ function refreshBadges() {
     const name = cell.dataset.name;
     const when = cell.querySelector(".when");
     cell.classList.toggle("next", name === nextUp);
+    cell.querySelector(".mark.go")?.remove();
+    if (name === nextUp) cell.append(goMark());
     if (!when) continue;
     if (state.photos[name].status === "hold") when.textContent = "on hold";
     else if (name === nextUp) when.textContent = `next · ${shortSlot(state.slots[name])}`;

@@ -5,8 +5,17 @@ Two halves that never run at the same time:
 
 - **Local curation app** (`app/`) — run by hand when new photos land. All human
   judgement happens here: sequencing, place labels, caption review.
-- **GitHub Actions cron** (`.github/workflows/`) — publishes one queued post per week,
-  unattended. Makes no decisions; reads `queue.yaml` top-down.
+- **GitHub Actions cron** (`.github/workflows/`) — publishes the queue on a
+  schedule, unattended. Makes no decisions; reads `queue.yaml` top-down.
+
+## Schedule
+
+`config.yaml` → `schedule:` holds local wall-clock slots (default: Wednesday
+11:30 and Sunday 10:30, `Europe/Amsterdam`), so the posting hour stays put
+across a DST change instead of sliding by one. Each slot drifts by up to
+`jitter_minutes` — deterministic, hashed from the slot itself, so the app and
+the publisher always agree on a time while nothing lands on the same exact
+minute every week. Add or remove entries under `slots:` to change frequency.
 
 ## Setup
 
@@ -30,7 +39,7 @@ already-published block.
 
 - Each cell is the 4:5 post itself. The white borders dissolve into the white
   page, the same way they will on the profile.
-- **Already-posted photos** appear below the queue, dimmed with a ✓. They come
+- **Already-posted photos** appear below the queue, marked with a ✓. They come
   from `photos/posted/` — the publisher moves files there as posts go out. To
   see the queue against your real profile, drop existing exports in there too.
 - Drag to reorder; neighbours slide out of the way. Order is saved as you drop.
@@ -38,17 +47,21 @@ already-published block.
   **next**. Held photos are skipped and don't consume a slot.
 - Click a photo to write its caption. **It saves as you type** — no Save needed
   for caption edits.
-- An orange **!** means the photo still needs attention: no caption, no EXIF
-  date, or too small to fill the frame.
+- A green **+** marks the photo going out next; an orange **!** means a photo
+  still needs attention (no caption, no EXIF date, or too small to fill the
+  frame). A photo can wear both.
 - **Post next photo now** publishes ahead of the schedule (needs Phase 4).
 - **Save** renders, writes `queue.yaml`, commits and pushes.
 
 `config.yaml` → `profile:` drives the mock header (username, bio, counts,
 highlights). It is cosmetic; nothing there reaches the Meta API.
 
-Auto-drafted captions are **switched off** (`config.yaml` → `caption.enabled:
-false`). The module, its prompt, and its 22 tests are still in the tree — set
-that flag to `true` to re-arm drafting in the app and in Save.
+**Suggest three captions** asks Claude for three drafts of the selected photo —
+one descriptive (dry humour allowed), one plain, one a little more poetic — and
+clicking one puts it in the box. Nothing is ever applied by itself, and Save
+never calls the model. Needs `ANTHROPIC_API_KEY` in `.env`; without it the
+button says so and everything else keeps working. Turn the whole thing off with
+`config.yaml` → `caption.enabled: false`.
 
 Other entry points:
 
@@ -260,7 +273,22 @@ aspect floor, which is why `border.py` asserts that size.
 
 ## Captions
 
-`claude-opus-5` with vision, constrained to `{"caption": "..."}` by a JSON schema.
+`claude-opus-5` with vision, constrained by a JSON schema to exactly three
+captions — `{"descriptive": ..., "plain": ..., "poetic": ...}`. Three named
+properties rather than an array because structured-output schemas don't support
+`minItems`/`maxItems`, so "exactly three" has to be structural. Each is checked
+against house style (one line, lowercase first letter, no hashtag, emoji,
+exclamation mark, or year); a voice that fails gets one retry naming the
+problem, and is dropped if it fails again rather than dragging the other two
+down with it.
+
+The key: an **API key from [console.anthropic.com](https://console.anthropic.com)**
+→ Settings → API keys → Create key, pasted into `.env` as
+`ANTHROPIC_API_KEY=sk-ant-…`. That's a Console account, billed per token and
+separate from a Claude.ai subscription — three captions with a photo attached
+runs to fractions of a cent. `.env` is git-ignored; the key never goes in
+`config.yaml` or in chat.
+
 Two things are deliberately kept away from the model:
 
 - **The date.** It returns only the descriptive clause; Python appends

@@ -60,9 +60,37 @@ class ProfileConfig:
 
 
 @dataclass(frozen=True)
-class ScheduleConfig:
+class Slot:
+    """One recurring weekly posting time, in local wall-clock terms."""
+
     weekday: int  # 0 = Monday
-    hour_utc: int
+    hour: int
+    minute: int = 0
+
+
+@dataclass(frozen=True)
+class ScheduleConfig:
+    """When posts go out.
+
+    Times are local wall-clock in `timezone`, not UTC, because the whole point
+    is to land inside a human attention window — and that window doesn't move
+    twice a year when the clocks do. Conversion to UTC happens at read time.
+    """
+
+    timezone: str
+    jitter_minutes: int
+    slots: tuple[Slot, ...]
+
+    @classmethod
+    def from_raw(cls, raw: dict) -> "ScheduleConfig":
+        slots = tuple(Slot(**s) for s in raw["slots"])
+        if not slots:
+            raise ValueError("config.yaml: schedule.slots must list at least one slot")
+        return cls(
+            timezone=raw["timezone"],
+            jitter_minutes=int(raw.get("jitter_minutes", 0)),
+            slots=tuple(sorted(slots, key=lambda s: (s.weekday, s.hour, s.minute))),
+        )
 
 
 @dataclass(frozen=True)
@@ -107,7 +135,7 @@ def load_config(path: Path | None = None) -> Config:
         border=BorderConfig(**raw["border"]),
         caption=CaptionConfig(**raw["caption"]),
         profile=ProfileConfig(**raw["profile"]),
-        schedule=ScheduleConfig(**raw["schedule"]),
+        schedule=ScheduleConfig.from_raw(raw["schedule"]),
         publish=PublishConfig(**raw["publish"]),
         paths=Paths(
             raw=REPO_ROOT / p["raw"],

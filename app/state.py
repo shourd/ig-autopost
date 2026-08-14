@@ -7,10 +7,12 @@ place labels aren't lost by closing the tab. It is git-ignored.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
 
@@ -38,6 +40,9 @@ class Photo:
     drafted: bool = False
     upscale_blocked: bool = False
     date: str | None = None
+    # The three drafted alternatives, keyed by voice. Working state only — the
+    # committed queue carries the one caption that was actually chosen.
+    caption_options: dict[str, str] = field(default_factory=dict)
 
     def queue_entry(self) -> dict:
         """The committed shape, exactly as specified."""
@@ -96,19 +101,54 @@ class State:
 
     # --- posting schedule --------------------------------------------------
 
-    def slot(self, n: int) -> datetime:
-        """UTC time of the nth upcoming posting slot (0 = the next one).
+    def _jitter(self, base: datetime) -> timedelta:
+        """A stable ± offset for one slot, derived from the slot itself.
 
-        Mirrors the Actions cron, so what the app shows is what will happen.
+        Deterministic on purpose. A random offset per call would make the times
+        in the app dance on every refresh and disagree with what the publisher
+        eventually does; hashing the nominal timestamp gives an offset that is
+        scattered across slots but identical every time anyone asks about *this*
+        slot. blake2b rather than hash(), which is salted per process.
         """
+        spread = self.cfg.schedule.jitter_minutes * 60
+        if spread <= 0:
+            return timedelta()
+        digest = hashlib.blake2b(base.isoformat().encode(), digest_size=8).digest()
+        return timedelta(seconds=int.from_bytes(digest, "big") % (2 * spread + 1) - spread)
+
+    def upcoming(self, count: int) -> list[datetime]:
+        """The next `count` posting times, in UTC, jittered and in order.
+
+        Slots are configured as local wall-clock times because the target is a
+        human attention window; the conversion to UTC happens here, so the hour
+        stays put across a DST change instead of sliding by one.
+        """
+        tz = ZoneInfo(self.cfg.schedule.timezone)
         now = datetime.now(timezone.utc)
-        days_ahead = (self.cfg.schedule.weekday - now.weekday()) % 7
-        slot = (now + timedelta(days=days_ahead)).replace(
-            hour=self.cfg.schedule.hour_utc, minute=0, second=0, microsecond=0
+        local = now.astimezone(tz)
+        # Midnight Monday of the current local week — arithmetic from there is
+        # wall-clock, which is what "Wednesday 11:30" is supposed to mean.
+        monday = local.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
+            days=local.weekday()
         )
-        if slot <= now:
-            slot += timedelta(days=7)
-        return slot + timedelta(days=7 * n)
+
+        out: list[datetime] = []
+        week = 0
+        while len(out) < count and week < 200:
+            for slot in self.cfg.schedule.slots:
+                base = (monday + timedelta(days=7 * week + slot.weekday)).replace(
+                    hour=slot.hour, minute=slot.minute
+                )
+                when = (base + self._jitter(base)).astimezone(timezone.utc)
+                if when > now:
+                    out.append(when)
+            week += 1
+        out.sort()
+        return out[:count]
+
+    def slot(self, n: int) -> datetime:
+        """UTC time of the nth upcoming posting slot (0 = the next one)."""
+        return self.upcoming(n + 1)[n]
 
     # --- persistence -------------------------------------------------------
 
@@ -165,12 +205,11 @@ class State:
 
     def as_json(self) -> dict:
         # Held photos are skipped, so they don't consume a posting slot.
-        slots: dict[str, str] = {}
-        n = 0
-        for name in self.order:
-            if self.photos[name].status == STATUS_READY:
-                slots[name] = self.slot(n).isoformat()
-                n += 1
+        ready = [n for n in self.order if self.photos[n].status == STATUS_READY]
+        slots = {
+            name: when.isoformat()
+            for name, when in zip(ready, self.upcoming(len(ready)))
+        }
 
         posted = self.posted()
         p = self.cfg.profile
@@ -184,6 +223,7 @@ class State:
             "photos": {k: asdict(v) for k, v in self.photos.items()},
             "posted": posted,
             "slots": slots,
+            "caption_enabled": self.cfg.caption.enabled,
             "profile": {
                 "username": live.get("username", p.username),
                 "display_name": live.get("name", p.display_name),

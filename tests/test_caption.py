@@ -26,8 +26,20 @@ CFG = CaptionConfig(model="claude-opus-5", max_tokens=2000, effort="low", max_ch
 # --- fake client -----------------------------------------------------------
 
 
-def reply(caption=None, *, raw=None, stop_reason="end_turn"):
-    text = raw if raw is not None else json.dumps({"caption": caption})
+def reply(caption=None, *, raw=None, stop_reason="end_turn", **voices):
+    """One response carrying all three voices.
+
+    `caption` sets the plain one — the house voice, and the one that becomes
+    `draft.caption` — while the other two default to valid lines, so a test can
+    break a single voice without having to spell out the other two.
+    """
+    payload = {
+        "descriptive": "a leopard crossing the road at last light",
+        "plain": caption if caption is not None else "leopard on the track",
+        "poetic": "the light goes, and the leopard goes with it",
+        **voices,
+    }
+    text = raw if raw is not None else json.dumps(payload)
     return SimpleNamespace(
         stop_reason=stop_reason,
         content=[SimpleNamespace(type="text", text=text)],
@@ -161,6 +173,17 @@ def test_missing_date_flags_and_uses_question_marks(dateless_photo):
     assert draft.flags == [FLAG_NO_DATE]
 
 
+def test_three_voices_are_offered_each_with_the_date(photo):
+    client = FakeClient(reply("sunset on Lamu"))
+
+    draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
+
+    assert list(draft.options) == ["descriptive", "plain", "poetic"]
+    assert all(text.endswith(" (Jun, 2023)") for text in draft.options.values())
+    # The house voice is the one pre-filled; the others are alternatives.
+    assert draft.caption == draft.options["plain"]
+
+
 def test_retries_once_with_the_specific_problem(photo):
     client = FakeClient(reply("Sunset on Lamu!"), reply("sunset on Lamu"))
 
@@ -169,13 +192,36 @@ def test_retries_once_with_the_specific_problem(photo):
     assert len(client.calls) == 2
     assert draft.caption == "sunset on Lamu (Jun, 2023)"
     assert draft.ok
-    # The retry tells the model what was wrong rather than just asking again.
+    # The retry names the voice and what was wrong with it, rather than just
+    # asking again — and doesn't re-litigate the two that were already fine.
     correction = client.calls[1]["messages"][-1]["content"]
-    assert "lowercase" in correction
+    assert "plain" in correction and "lowercase" in correction
+    assert "poetic" not in correction
+
+
+def test_a_voice_that_never_validates_is_dropped_not_fatal(photo):
+    client = FakeClient(reply(poetic="Nope!"), reply(poetic="Still Wrong!"))
+
+    draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
+
+    assert list(draft.options) == ["descriptive", "plain"]
+    assert draft.ok
+
+
+def test_a_good_line_survives_a_bad_retry(photo):
+    """First-pass winners are kept; the retry can only add, never take away."""
+    client = FakeClient(reply(poetic="Nope!"), reply(descriptive="Broken!", poetic="quiet light"))
+
+    draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
+
+    assert draft.options["descriptive"] == "a leopard crossing the road at last light (Jun, 2023)"
+    assert draft.options["poetic"] == "quiet light (Jun, 2023)"
 
 
 def test_two_failures_fall_back_to_empty_and_flag(photo):
-    client = FakeClient(reply("Nope!"), reply("Still Wrong!"))
+    bad = {"descriptive": "Nope!", "plain": "Nope!", "poetic": "Nope!"}
+    worse = {"descriptive": "Still Wrong!", "plain": "Still Wrong!", "poetic": "Still Wrong!"}
+    client = FakeClient(reply(**bad), reply(**worse))
 
     draft = draft_caption(photo, place="Lamu", cfg=CFG, client=client)
 
@@ -221,6 +267,11 @@ def test_request_shape(photo):
     assert "temperature" not in call
     assert call["output_config"]["format"]["type"] == "json_schema"
     assert call["output_config"]["effort"] == "low"
+    # Three named properties rather than an array: structured-output schemas
+    # don't support minItems/maxItems, so "exactly three" has to be structural.
+    schema = call["output_config"]["format"]["schema"]
+    assert schema["required"] == ["descriptive", "plain", "poetic"]
+    assert schema["additionalProperties"] is False
     image = call["messages"][0]["content"][0]
     assert image["type"] == "image"
     assert image["source"]["media_type"] == "image/jpeg"

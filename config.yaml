@@ -22,8 +22,19 @@ profile:
   highlights: [savannah, mountains, oceans]
 
 schedule:
-  weekday: 0              # 0 = Monday, matching the GitHub Actions cron
-  hour_utc: 8
+  # Local wall-clock, not UTC: the target is a human attention window, and that
+  # window doesn't move when the clocks do. Converted to UTC when read.
+  timezone: Europe/Amsterdam
+  # Posting times drift ± this many minutes. Deterministic per slot (hashed from
+  # the slot itself), so the app and the publisher always agree — it just stops
+  # every post landing on the same suspiciously exact minute.
+  jitter_minutes: 25
+  slots:
+    # 0 = Monday. Wednesday late morning is the most consistently cited window
+    # across published studies; Sunday morning is the leisure-scrolling one.
+    - {weekday: 2, hour: 11, minute: 30}   # Wednesday
+    - {weekday: 6, hour: 10, minute: 30}   # Sunday
+    # - {weekday: 4, hour: 18, minute: 0}  # Friday evening — uncomment for 3/week
 
 publish:
   api_version: v26.0      # pinned; Meta retires versions on a ~2-year clock
@@ -33,12 +44,13 @@ publish:
   todoist: true           # a "post is live" task; failure never rolls back a post
 
 caption:
-  # Auto-drafting is switched off — Sjoerd writes captions by hand. The module
-  # and its tests stay in the tree; flip `enabled` back to true to re-arm it.
-  enabled: false
+  # Suggestions only: the app offers three drafts per photo and never fills the
+  # caption box by itself. Needs ANTHROPIC_API_KEY in .env; with the key absent
+  # the button reports that and everything else keeps working.
+  enabled: true
   model: "claude-opus-5"
   max_tokens: 2000
-  effort: low              # a one-line caption; low keeps cost and latency down
+  effort: low              # three one-line captions; low keeps cost and latency down
   max_chars: 90            # style guard, not an API limit
 
 paths:

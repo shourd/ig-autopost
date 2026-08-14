@@ -60,7 +60,10 @@ def _refresh_flags(photo) -> None:
     from src.exif import read_capture_date
 
     drafting = _state.cfg.caption.enabled
-    flags = [f for f in photo.flags if f == FLAG_CAPTION_FAILED and drafting]
+    # A drafting failure stops mattering the moment there's a caption, however
+    # it got there — otherwise one dead API call badges the photo forever.
+    keep_failed = drafting and not photo.caption.strip()
+    flags = [f for f in photo.flags if f == FLAG_CAPTION_FAILED and keep_failed]
 
     when, _ = read_capture_date(_state.raw_path(photo.file))
     photo.date = when.isoformat() if when else None
@@ -73,16 +76,17 @@ def _refresh_flags(photo) -> None:
     photo.flags = flags
 
 
-def _draft(names: list[str]) -> list[str]:
-    """Draft captions, returning one message per photo that failed.
+def _draft(names: list[str], force: bool = False) -> list[str]:
+    """Draft caption suggestions, returning one message per photo that failed.
 
-    DISABLED: `caption.enabled` is false in config.yaml — Sjoerd writes captions
-    by hand. The code and its tests are left intact; flipping that flag back to
-    true re-arms drafting everywhere (this function, Save, and the API route).
+    Suggestions only: the three drafted lines are stored as options for the app
+    to offer, and the caption itself is only pre-filled when Sjoerd hasn't
+    written one. `force` is what the per-photo Suggest button sends — an
+    explicit request re-drafts even a caption that has already been edited,
+    because that's precisely when a second opinion is being asked for.
 
-    A drafting failure — no API key, a network blip — must not take down the
-    whole Save. The photo gets flagged, the reason is reported, and the queue
-    still gets written.
+    A drafting failure — no API key, a network blip — must not take anything
+    else down. The photo gets flagged and the reason is reported.
     """
     from src.caption import FLAG_CAPTION_FAILED
 
@@ -92,7 +96,7 @@ def _draft(names: list[str]) -> list[str]:
     errors: list[str] = []
     for name in names:
         photo = _state.photos.get(name)
-        if not photo or photo.caption_reviewed:
+        if not photo or (photo.caption_reviewed and not force):
             continue
         _ensure_processed(name)
         try:
@@ -109,7 +113,11 @@ def _draft(names: list[str]) -> list[str]:
                 _state.save()
             continue
         with _lock:
-            photo.caption = draft.caption
+            photo.caption_options = draft.options
+            # Never overwrite something Sjoerd typed — the options are offered
+            # in the UI and applied by clicking one.
+            if not photo.caption.strip():
+                photo.caption = draft.caption
             photo.drafted = True
             photo.date = draft.date.isoformat() if draft.date else None
             extra = {"too_small"} if photo.upscale_blocked else set()
@@ -134,16 +142,12 @@ def _save() -> dict:
         _ensure_processed(photo.file)
     log.append(f"rendered {len(publishable)} photo(s)")
 
-    if _state.cfg.caption.enabled:
-        missing = [p.file for p in publishable if not p.caption and not p.drafted]
-        if missing:
-            errors = _draft(missing)
-            log.append(f"drafted {len(missing) - len(errors)}/{len(missing)} caption(s)")
-            log += [f"  ! {e}" for e in errors]
-    else:
-        blank = sum(1 for p in publishable if not p.caption.strip())
-        if blank:
-            log.append(f"{blank} photo(s) still have no caption")
+    # Save never calls the model. Drafting is a suggestion Sjoerd asks for per
+    # photo, so pressing Save can't quietly spend money or fill a caption box
+    # with a line nobody read.
+    blank = sum(1 for p in publishable if not p.caption.strip())
+    if blank:
+        log.append(f"{blank} photo(s) still have no caption")
 
     entries = [p.queue_entry() for p in _state.ordered()]
     _state.cfg.paths.queue.write_text(
@@ -302,14 +306,13 @@ class Handler(BaseHTTPRequestHandler):
                     _state.save()
                     return self._json({"photo": _state.as_json()["photos"][name]})
 
-            # Auto-drafting is off (config.yaml: caption.enabled). The route is
-            # left wired so re-enabling is a one-line config change.
             if path == "/api/draft":
                 names = body.get("files") or [
                     p.file for p in _state.ordered()
                     if not p.caption and p.status != STATUS_POSTED
                 ]
-                errors = _draft(names)
+                # An explicit per-photo request re-drafts even a reviewed caption.
+                errors = _draft(names, force=bool(body.get("files")))
                 return self._json({**_state.as_json(), "errors": errors})
 
             if path == "/api/post-now":

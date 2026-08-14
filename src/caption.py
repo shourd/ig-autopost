@@ -1,4 +1,9 @@
-"""Draft a one-line caption for a photo, using Claude with vision.
+"""Draft three candidate captions for a photo, using Claude with vision.
+
+Three, not one, because picking is faster than writing and the right register
+depends on the picture: the same frame can want a dry factual line, the plain
+house voice, or something with a little more music in it. The app shows all
+three and Sjoerd clicks one — or writes his own, which stays the default path.
 
 Two things are deliberately kept away from the model:
 
@@ -31,60 +36,89 @@ FLAG_NO_DATE = "no_date"
 FLAG_NO_PLACE = "no_place"
 FLAG_CAPTION_FAILED = "caption_failed"
 
+# Order matters: `plain` is the house voice and becomes the pre-filled default,
+# the other two are alternatives to click. The keys are also the schema keys.
+VOICES = ("descriptive", "plain", "poetic")
+DEFAULT_VOICE = "plain"
+
+VOICE_LABELS = {
+    "descriptive": "descriptive",
+    "plain": "plain",
+    "poetic": "poetic",
+}
+
 SYSTEM_PROMPT = """\
-You write one-line captions for a photography account. The voice is plain and \
-observational, with room for a little quiet lyricism — never florid, and never \
-the kind of line a caption generator produces.
+You write one-line captions for a photography account. Given one photograph, \
+write three different captions for it — the same picture in three registers, so \
+the photographer can pick the one that fits.
 
-Write a single short caption describing what is actually visible in the frame.
+The three registers:
 
-- One line. Short: the house style runs from about three to ten words.
+- descriptive: concrete and specific about what is actually in the frame. Name \
+the thing, the light, the weather, the hour. Dry humour is welcome when the \
+picture genuinely offers it — an animal caught mid-indignity, a sign saying \
+something absurd — but it must come from the photo, never be bolted on, and \
+never be a joke about the viewer or a pun on the location.
+- plain: the house voice. Understated and observational, a plain statement of \
+what is there. No wordplay, no sentiment, no slogan, nothing that sounds like a \
+motivational quote or a stock caption.
+- poetic: a little more lyrical — one image, or a bit of rhythm. Still short, \
+still about something you can actually see. No abstractions like soul, journey, \
+magic, wanderlust, or paradise, and no metaphor that could have been written \
+without looking at the photo.
+
+Rules for all three:
+
+- One line each. Short: the house style runs from about three to ten words.
 - Start with a lowercase letter.
 - No hashtags, no emoji, no exclamation marks, no quotation marks.
 - No date, and no year. Those are added afterwards.
 - Describe what is in the frame. Don't infer the occasion, the photographer's \
 intent, or what anyone in the photo is feeling.
+- Three genuinely different lines. Don't hand back the same caption reworded.
 
 On place names: you may use only the place given to you in the user message. \
-If no place is given, the caption must contain no location at all — no country, \
+If no place is given, the captions must contain no location at all — no country, \
 no region, no landmark, and no stand-in like "the savannah" or "the tropics" \
 standing where a name would go. A photograph does not tell you where it was \
 taken, so any place name you supply yourself is a guess, and a confident wrong \
-one is the single worst thing this caption can contain.
+one is the single worst thing these captions can contain.
 
 Naming the place is optional even when you have been given one — use it when it \
 reads well, leave it out when the picture is about something else.
 
-Examples of the target register (each written for a photo, place in brackets):
-  [Lamu] sunset on Lamu
-  [Masai Mara] a leopard crossing the last light
-  [no place given] low cloud coming over the ridge
+An example of the target register, for a photo of a leopard at dusk [Masai Mara]:
+  descriptive: a leopard crossing the road at last light
+  plain: leopard on the track, Masai Mara
+  poetic: the light goes, and the leopard goes with it
 """
 
 CAPTION_SCHEMA = {
     "type": "object",
     "properties": {
-        "caption": {
+        voice: {
             "type": "string",
             "description": (
-                "The caption clause. One line, lowercase first letter, no date, "
-                "no hashtags, no emoji, no exclamation marks."
+                f"The {voice} caption. One line, lowercase first letter, no "
+                "date, no hashtags, no emoji, no exclamation marks."
             ),
         }
+        for voice in VOICES
     },
-    "required": ["caption"],
+    "required": list(VOICES),
     "additionalProperties": False,
 }
 
 
 @dataclass
 class CaptionDraft:
-    """A drafted caption plus everything the curation app needs to badge it."""
+    """Three drafted captions plus everything the curation app needs to badge them."""
 
     file: str
     caption: str
     place: str | None
     date: datetime | None
+    options: dict[str, str] = field(default_factory=dict)
     date_source: str | None = None
     flags: list[str] = field(default_factory=list)
 
@@ -124,7 +158,7 @@ def _user_content(image: Path, place: str | None) -> list[dict]:
         stated = f"Place: {place}. This is confirmed — you may use this name."
     else:
         stated = (
-            "Place: not known. Write a caption containing no location of any kind."
+            "Place: not known. Write captions containing no location of any kind."
         )
     return [
         {
@@ -142,7 +176,7 @@ def draft_caption(
     cfg: CaptionConfig | None = None,
     client=None,
 ) -> CaptionDraft:
-    """Draft a caption for `image`, reading the date from `source_for_date`.
+    """Draft three captions for `image`, reading the date from `source_for_date`.
 
     `image` should be the processed 1080x1350 JPEG — it is small, already sRGB,
     and is what actually gets posted. The date comes from the raw file, which
@@ -169,6 +203,11 @@ def draft_caption(
         client = anthropic.Anthropic(api_key=secret("ANTHROPIC_API_KEY"))
 
     messages = [{"role": "user", "content": _user_content(image, place)}]
+    suffix = date_suffix(when)
+
+    # Accepted lines survive across attempts, so one bad voice on the retry
+    # can't discard two good ones from the first pass.
+    accepted: dict[str, str] = {}
 
     # One retry: the schema makes malformed JSON impossible, so a second attempt
     # is only ever needed for a style violation, and the model gets told which.
@@ -190,23 +229,37 @@ def draft_caption(
 
         raw = next((b.text for b in response.content if b.type == "text"), "")
         try:
-            text = json.loads(raw)["caption"].strip()
-        except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
-            text, problem = "", "The response was not the expected JSON object."
+            payload = json.loads(raw)
+            candidates = {v: str(payload[v]).strip() for v in VOICES}
+        except (json.JSONDecodeError, KeyError, TypeError):
+            problems = {v: "The response was not the expected JSON object." for v in VOICES}
         else:
-            problem = _validate(text, cfg.max_chars)
+            problems = {}
+            for voice in VOICES:
+                if voice in accepted:
+                    continue
+                problem = _validate(candidates[voice], cfg.max_chars)
+                if problem is None:
+                    accepted[voice] = candidates[voice].rstrip(".") + suffix
+                else:
+                    problems[voice] = problem
 
-        if problem is None:
-            draft.caption = text.rstrip(".") + date_suffix(when)
-            return draft
+        if not problems:
+            break
 
         if attempt == 0:
+            correction = "\n".join(f"{v}: {p}" for v, p in problems.items())
             messages += [
                 {"role": "assistant", "content": raw},
-                {"role": "user", "content": f"{problem} Rewrite the caption."},
+                {"role": "user", "content": f"{correction}\nRewrite those captions."},
             ]
 
-    # Both attempts failed style validation. An empty caption is honest; the app
-    # badges it and Sjoerd writes one himself.
-    draft.flags.append(FLAG_CAPTION_FAILED)
+    if not accepted:
+        # Every voice failed style validation twice. An empty caption is honest;
+        # the app badges it and Sjoerd writes one himself.
+        draft.flags.append(FLAG_CAPTION_FAILED)
+        return draft
+
+    draft.options = {v: accepted[v] for v in VOICES if v in accepted}
+    draft.caption = accepted.get(DEFAULT_VOICE) or next(iter(draft.options.values()))
     return draft
