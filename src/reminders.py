@@ -15,7 +15,7 @@ Nothing here is ever allowed to raise. A Todoist outage must not stop a Save.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import requests
@@ -102,6 +102,10 @@ def _alarm(token: str, task_id: str, lead: int) -> str | None:
 def sync(state, image_url) -> list[str]:
     """Create, update, and clear the reminders for the queue. Returns log lines.
 
+    Two channels, one list of posts: Todoist carries the caption and the links
+    and is the written record; the Apple reminder is what actually reaches the
+    phone, since Todoist's own alarms need a paid plan.
+
     `image_url` is passed in rather than imported so this module doesn't drag in
     the publisher (and its git calls) just to build a URL.
     """
@@ -109,22 +113,50 @@ def sync(state, image_url) -> list[str]:
     if not cfg.publish.reminders:
         return []
 
-    token = secret("TODOIST_API_TOKEN", required=False)
-    if not token:
-        return ["reminders skipped (no TODOIST_API_TOKEN in .env)"]
-
     from app.state import STATUS_READY
 
     ready = [p for p in state.ordered() if p.status == STATUS_READY]
     upcoming = ready[: cfg.publish.reminder_count]
     slots = state.upcoming(len(upcoming))
+    tz = ZoneInfo(cfg.schedule.timezone)
+
+    posts = [
+        (photo, when, _body(photo, when, [
+            image_url(state.processed_path(f).name, cfg) for f in photo.files
+        ], tz))
+        for photo, when in zip(upcoming, slots)
+    ]
+
+    log = _todoist(state, posts, cfg)
+    log += _apple(posts, cfg)
+    return log
+
+
+def _apple(posts, cfg) -> list[str]:
+    """Mirror the posts into the Reminders app, alarm set `lead` ahead."""
+    if not cfg.publish.reminder_apple:
+        return []
+
+    from src.apple_reminders import Nudge, sync as apple_sync
+
+    lead = timedelta(minutes=cfg.publish.reminder_lead_minutes)
+    nudges = [
+        Nudge(title=body["content"], body=body["description"], when=when - lead)
+        for _, when, body in posts
+    ]
+    return apple_sync(nudges, cfg.publish.reminder_apple_list)
+
+
+def _todoist(state, posts, cfg) -> list[str]:
+    token = secret("TODOIST_API_TOKEN", required=False)
+    if not token:
+        return ["Todoist skipped (no TODOIST_API_TOKEN in .env)"]
 
     log: list[str] = []
     created = updated = removed = 0
+    upcoming = [photo for photo, _, _ in posts]
 
-    for photo, when in zip(upcoming, slots):
-        urls = [image_url(state.processed_path(f).name, cfg) for f in photo.files]
-        body = _body(photo, when, urls, ZoneInfo(cfg.schedule.timezone))
+    for photo, _, body in posts:
         try:
             if photo.reminder_id:
                 resp = requests.post(
@@ -147,9 +179,12 @@ def sync(state, image_url) -> list[str]:
             log.append(f"! reminder for {photo.file} failed: {exc}")
             continue
 
-        problem = _alarm(token, photo.reminder_id, cfg.publish.reminder_lead_minutes)
-        if problem and problem not in log:  # one plan warning is plenty
-            log.append(problem)
+        # Only worth trying when Todoist is the notifying channel; with Apple
+        # Reminders on, a premium warning every Save is just noise.
+        if not cfg.publish.reminder_apple:
+            problem = _alarm(token, photo.reminder_id, cfg.publish.reminder_lead_minutes)
+            if problem and problem not in log:  # one plan warning is plenty
+                log.append(problem)
 
     # Anything no longer in the window — posted, held, pushed down the queue —
     # loses its task, so Todoist never says "post this" about a live post.
@@ -168,7 +203,25 @@ def sync(state, image_url) -> list[str]:
             log.append(f"! clearing reminder for {photo.file} failed: {exc}")
         photo.reminder_id = None
 
-    lead = cfg.publish.reminder_lead_minutes
     parts = [f"{created} new", f"{updated} updated", f"{removed} cleared"]
-    log.insert(0, f"reminders: {', '.join(parts)} ({lead} min before posting)")
+    log.insert(0, f"Todoist: {', '.join(parts)}")
     return log
+
+
+def main() -> None:
+    """`uv run python -m src.reminders` — rewrite the reminders without a Save.
+
+    Mostly for the first run: macOS asks permission to control Reminders the
+    first time, and that dialog wants a terminal someone is actually looking at.
+    """
+    from app.state import State
+    from src.publish import image_url
+
+    state = State()
+    for line in sync(state, image_url):
+        print(f"  {line}")
+    state.save()
+
+
+if __name__ == "__main__":
+    main()

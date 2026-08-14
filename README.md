@@ -47,14 +47,26 @@ pushed back) loses its task, because a reminder to post something already live
 is worse than none. Only the next `reminder_count` posts get one; the queue can
 be a hundred deep.
 
-Each task also gets a push reminder `reminder_lead_minutes` (default 120) before
-the slot, and its description opens with the posting time in local terms, since
-the notification arrives well before the moment it's talking about.
+The notification itself comes from the **macOS Reminders app** (`publish.
+reminder_apple`), set `reminder_lead_minutes` — default 120 — before the slot,
+and iCloud carries it to the phone. Todoist's own alarms answer `403
+PREMIUM_ONLY` on a free plan, which is why the two channels split: Todoist holds
+the caption and the links, Reminders does the buzzing. Both descriptions open
+with the posting time in local terms, since the notification arrives well before
+the moment it's talking about.
 
-Needs `TODOIST_API_TOKEN` in `.env`. **The push itself needs a paid Todoist
-plan** — the reminders endpoint answers `403 PREMIUM_ONLY` on a free account.
-The tasks are still created, with their due times, and still show up in Today;
-they just don't buzz on their own.
+The first run raises a macOS permission dialog ("… wants to control Reminders"),
+and osascript blocks until it's answered, so trigger it from a terminal you're
+looking at rather than discovering it mid-Save:
+
+```bash
+uv run python -m src.reminders
+```
+
+If it was refused: System Settings → Privacy & Security → Automation, and allow
+Reminders for your terminal. Set `reminder_apple_list` to put them in a specific
+list, or leave it null for the default one. Todoist needs `TODOIST_API_TOKEN` in
+`.env`; with the token absent that half is skipped and the reminders still work.
 
 ## Setup
 

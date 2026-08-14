@@ -103,6 +103,8 @@ class PublishConfig:
     reminders: bool = False
     reminder_count: int = 4
     reminder_lead_minutes: int = 120
+    reminder_apple: bool = False
+    reminder_apple_list: str | None = None
 
 
 @dataclass(frozen=True)

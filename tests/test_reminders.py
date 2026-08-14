@@ -55,7 +55,7 @@ class FakeTodoist:
 
 
 class FakeState:
-    def __init__(self, photos, count=4, lead=120):
+    def __init__(self, photos, count=4, lead=120, apple=False):
         cfg = load_config()
         self.cfg = dataclasses.replace(
             cfg,
@@ -64,6 +64,10 @@ class FakeState:
                 reminders=True,
                 reminder_count=count,
                 reminder_lead_minutes=lead,
+                # Off unless a test asks: the real thing talks to the Reminders
+                # app, which no test should be poking at.
+                reminder_apple=apple,
+                reminder_apple_list=None,
             ),
         )
         self.photos = {p.file: p for p in photos}
@@ -151,6 +155,30 @@ def todoist_ids(state):
     return [p.reminder_id for p in state.photos.values() if p.reminder_id]
 
 
+def test_the_apple_reminder_fires_the_lead_time_before_the_slot(todoist, monkeypatch):
+    captured = {}
+
+    def fake_apple(nudges, list_name):
+        captured["nudges"] = nudges
+        captured["list"] = list_name
+        return ["Apple Reminders: 1 in the default list"]
+
+    monkeypatch.setattr("src.apple_reminders.sync", fake_apple)
+    state = FakeState([Photo(file="a.jpg", caption="one")], apple=True)
+
+    log = reminders.sync(state, url_for)
+
+    nudge = captured["nudges"][0]
+    assert nudge.when == datetime(2026, 8, 19, 7, 52, tzinfo=timezone.utc)  # 2h before
+    assert nudge.title == "Post a.jpg to Instagram"
+    assert "Post at Wed 19 Aug, 11:52." in nudge.body
+    assert any("Apple Reminders" in line for line in log)
+    # Todoist's premium-only alarm isn't worth attempting, or warning about,
+    # once something else is doing the notifying.
+    assert todoist.alarms == []
+    assert not any("paid Todoist plan" in line for line in log)
+
+
 def test_the_task_carries_every_photo_of_a_carousel(todoist):
     state = FakeState([Photo(file="A.jpg", extra=["B.jpg"], caption="the pair")])
 
@@ -220,5 +248,5 @@ def test_no_token_is_a_note_not_a_failure(monkeypatch):
     state = FakeState([Photo(file="a.jpg")])
 
     assert reminders.sync(state, url_for) == [
-        "reminders skipped (no TODOIST_API_TOKEN in .env)"
+        "Todoist skipped (no TODOIST_API_TOKEN in .env)"
     ]

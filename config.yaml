@@ -47,6 +47,11 @@ publish:
   reminders: true
   reminder_count: 4         # only the next few — the queue can be a hundred deep
   reminder_lead_minutes: 120  # the phone buzzes this long before the slot
+  # Todoist keeps the caption and the links, but its own alarms need a paid
+  # plan, so the notification comes from the Reminders app instead — iCloud
+  # carries it to the phone.
+  reminder_apple: true
+  reminder_apple_list: null   # null = the default Reminders list
 
 caption:
   # Suggestions only: the app offers three drafts per photo and never fills the
