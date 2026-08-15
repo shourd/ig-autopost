@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 import re
 import time
 from collections.abc import Iterable
@@ -34,7 +35,8 @@ RESERVED = {"avatar.jpg"}
 # post. A trailing letter only groups when at least one sibling shares the stem,
 # so a lone file that happens to end in a letter stays a single post.
 CAROUSEL_SUFFIX = re.compile(r"^(?P<base>.+?)(?P<letter>[A-J])$")
-CAROUSEL_MAX = 10  # Meta's limit on children per carousel
+CAROUSEL_LETTERS = "ABCDEFGHIJ"
+CAROUSEL_MAX = len(CAROUSEL_LETTERS)  # Meta's limit on children per carousel
 
 
 def carousel_groups(names: Iterable[str]) -> dict[str, list[str]]:
@@ -296,6 +298,66 @@ class State:
         """
         self.order.sort(key=lambda n: (self.photos[n].date is None, self.photos[n].date or "", n))
         self.save()
+
+    def shuffle(self) -> None:
+        """Deal the queue into a random order.
+
+        Only the unpublished part moves. Posted entries keep their exact index —
+        they're the record of what already went out, and shuffling history would
+        be a lie about the profile.
+        """
+        movable = [n for n in self.order if self.photos[n].status != STATUS_POSTED]
+        random.shuffle(movable)
+        dealt = iter(movable)
+        self.order = [
+            n if self.photos[n].status == STATUS_POSTED else next(dealt) for n in self.order
+        ]
+        self.save()
+
+    def promote(self, lead: str, member: str) -> list[tuple[str, str]]:
+        """Make `member` the first photo of the carousel led by `lead`.
+
+        The A/B/C letters are the grouping rule, so they're also the fix: the
+        photos are re-lettered on disk into the order asked for, the rest keeping
+        their relative places. Renaming rather than storing an override means the
+        filenames never disagree with the app, and `rescan` — which rebuilds
+        every carousel from the folder — can't undo it on the next refresh.
+
+        Returns the (old, new) renames. Raises KeyError if `member` isn't in
+        this post.
+        """
+        photo = self.photos[lead]
+        files = photo.files
+        if member not in files:
+            raise KeyError(member)
+        if member == files[0]:
+            return []
+
+        base = CAROUSEL_SUFFIX.fullmatch(Path(lead).stem)["base"]
+        wanted = [member, *(f for f in files if f != member)]
+        renames = [
+            (name, f"{base}{CAROUSEL_LETTERS[i]}{Path(name).suffix}")
+            for i, name in enumerate(wanted)
+        ]
+        renames = [(old, new) for old, new in renames if old != new]
+
+        # Two passes, via dotted temporaries: the names are being permuted, so a
+        # direct rename would land on a file that hasn't moved out of the way
+        # yet. A dot prefix also keeps a half-finished swap out of `rescan`.
+        for resolve in (self.raw_path, self.processed_path):
+            for old, new in renames:
+                src = resolve(old)
+                if src.is_file():
+                    src.replace(src.with_name(f".promote-{resolve(new).name}"))
+            for _, new in renames:
+                dst = resolve(new)
+                tmp = dst.with_name(f".promote-{dst.name}")
+                if tmp.is_file():
+                    tmp.replace(dst)
+
+        self.rescan()
+        self.save()
+        return renames
 
     def known_file(self, name: str) -> bool:
         """True for any raw file the app is willing to serve, carousels included."""

@@ -244,7 +244,11 @@ textarea.draft { color: var(--dim); font-style: italic; }
   object-fit: cover;
   border: 1px solid var(--line);
   border-radius: 4px;
+  cursor: pointer;
 }
+/* The one Instagram shows on the grid and in the feed before you swipe. */
+.strip img.lead { border-color: #8c8c8c; }
+.strip img.on { border-color: var(--link); box-shadow: 0 0 0 2px rgba(0, 149, 246, .25); }
 
 /* Drafted alternatives: click one to put it in the box. Never applied on their
    own — a caption goes out because it was chosen, not because it was returned. */

@@ -32,6 +32,13 @@ shows every frame in order. One caption covers the post, drafted from the lead
 photo alone — it's the one that stops the scroll. Meta's limit is 10 per
 carousel and anything past that is dropped.
 
+Which photo leads is worth getting right — it's the one on the grid, the one the
+caption is drafted from, and the only one most people see. Click a frame in the
+side panel and **Make this the first photo** re-letters the files on disk so it
+becomes the A, the rest keeping their order. Renaming rather than remembering a
+preference: the letters *are* the grouping rule, and an override held only in
+the app would be undone by the next folder scan.
+
 Publishing is a container per photo (`is_carousel_item`), each polled to
 FINISHED, then a parent container with `media_type=CAROUSEL` that carries the
 caption. A caption on a child is silently discarded, which is the kind of thing
@@ -93,7 +100,10 @@ already-published block.
 - **Already-posted photos** appear below the queue, marked with a ✓. They come
   from `photos/posted/` — the publisher moves files there as posts go out. To
   see the queue against your real profile, drop existing exports in there too.
-- Drag to reorder; neighbours slide out of the way. Order is saved as you drop.
+- Drag to reorder; neighbours slide out of the way once the cursor is past their
+  middle. Order is saved as you drop.
+- **Send to start of the queue** puts the selected photo first, instead of
+  dragging it up past eighty others.
 - Each queued photo shows the date it will go out. The next one is badged
   **next**. Held photos are skipped and don't consume a slot.
 - Click a photo to write its caption. **It saves as you type** — no Save needed
@@ -104,15 +114,23 @@ already-published block.
 - **Remove** takes a photo out of the queue by moving it to `photos/removed/`,
   not by deleting it — drag it back into `photos/raw/` to undo. A carousel
   leaves as a unit; half a post isn't a thing.
-- **Post next photo now** publishes ahead of the schedule. Select a single photo
-  and it becomes **Post this photo now** and publishes that one instead. Either
-  way the first click is a dry run and a second confirms.
+- **Post next photo** publishes ahead of the schedule. Select a single photo and
+  it becomes **Post this photo** and publishes that one instead. Either way the
+  first click is a dry run and a second confirms.
 - **Save** renders, writes `queue.yaml`, commits, pushes, and rewrites the
   reminders.
 
-The queue starts in whatever order the folder scan produced. `State.sort_by_date`
-puts it in date order, oldest first, so it drains the way the photos happened —
-in the grid that reads newest at the top-left, exactly like the profile.
+The queue starts in whatever order the folder scan produced, and new photos land
+at the back. Two one-off passes rearrange the whole thing — both leave the
+already-posted entries exactly where they are:
+
+```bash
+uv run python -c 'from app.state import State; State().shuffle()'      # random
+uv run python -c 'from app.state import State; State().sort_by_date()' # oldest first
+```
+
+Close the app first: it keeps the queue in memory and would write its own copy
+back over yours.
 
 `config.yaml` → `profile:` drives the mock header (username, bio, counts,
 highlights). It is cosmetic; nothing there reaches the Meta API.

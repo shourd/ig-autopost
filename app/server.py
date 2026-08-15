@@ -365,6 +365,18 @@ class Handler(BaseHTTPRequestHandler):
                     moved = _state.remove(name)
                 return self._json({**_state.as_json(), "moved": moved})
 
+            if path == "/api/promote":
+                lead = Path(body["file"]).name
+                member = Path(body["member"]).name
+                with _lock:
+                    if lead not in _state.photos:
+                        return self._json({"error": "unknown photo"}, 404)
+                    try:
+                        renamed = _state.promote(lead, member)
+                    except KeyError:
+                        return self._json({"error": f"{member} isn't in this post"}, 404)
+                return self._json({**_state.as_json(), "renamed": renamed})
+
             if path == "/api/post-now":
                 target = body.get("file")
                 return self._json(_post_now(

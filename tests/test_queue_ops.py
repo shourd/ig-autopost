@@ -1,4 +1,4 @@
-"""Taking photos out of the queue, and putting it in date order."""
+"""Taking photos out of the queue, and choosing what goes where in it."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import dataclasses
 import pytest
 
 from app import state as state_module
-from app.state import Photo, State
+from app.state import STATUS_POSTED, Photo, State
 from src.config import load_config
 
 
@@ -136,3 +136,127 @@ def test_photos_taken_at_the_same_moment_sort_by_name(state):
     state.sort_by_date()
 
     assert state.order == ["a.jpg", "b.jpg"]
+
+
+# --- shuffling -------------------------------------------------------------
+
+
+@pytest.fixture
+def reversing_shuffle(monkeypatch):
+    """A deterministic stand-in, so the assertions can be exact."""
+    monkeypatch.setattr(state_module.random, "shuffle", lambda seq: seq.reverse())
+
+
+def test_shuffle_deals_the_queue_out_again(state, reversing_shuffle):
+    for name in ("a.jpg", "b.jpg", "c.jpg"):
+        add(state, name)
+
+    state.shuffle()
+
+    assert state.order == ["c.jpg", "b.jpg", "a.jpg"]
+
+
+def test_posted_photos_keep_their_place(state, reversing_shuffle):
+    """History is the record of what went out; shuffling it would be a lie."""
+    add(state, "a.jpg")
+    add(state, "gone.jpg").status = STATUS_POSTED
+    add(state, "b.jpg")
+    add(state, "c.jpg")
+
+    state.shuffle()
+
+    assert state.order == ["c.jpg", "gone.jpg", "b.jpg", "a.jpg"]
+
+
+def test_shuffle_loses_nothing(state):
+    names = [f"{i}.jpg" for i in range(20)]
+    for name in names:
+        add(state, name)
+
+    state.shuffle()
+
+    assert sorted(state.order) == sorted(names)
+
+
+# --- choosing which photo of a carousel leads ------------------------------
+
+
+def carousel(state, base="_DSF1234", letters="ABC"):
+    """A carousel whose files can be told apart by their contents."""
+    photo = add(state, f"{base}A.jpg", extra=[f"{base}{x}.jpg" for x in letters[1:]])
+    for member in photo.files:
+        (state.cfg.paths.raw / member).write_bytes(member.encode())
+        state.processed_path(member).write_bytes(f"render {member}".encode())
+    return photo
+
+
+def content(state, name):
+    return (state.cfg.paths.raw / name).read_bytes().decode()
+
+
+def test_promoting_the_second_photo_swaps_the_letters(state):
+    carousel(state)
+
+    renamed = state.promote("_DSF1234A.jpg", "_DSF1234B.jpg")
+
+    assert sorted(renamed) == [
+        ("_DSF1234A.jpg", "_DSF1234B.jpg"),
+        ("_DSF1234B.jpg", "_DSF1234A.jpg"),
+    ]
+    assert content(state, "_DSF1234A.jpg") == "_DSF1234B.jpg"
+    assert content(state, "_DSF1234B.jpg") == "_DSF1234A.jpg"
+
+
+def test_the_photos_left_behind_keep_their_order(state):
+    """Promoting C means C, A, B — not C and then whatever."""
+    carousel(state)
+
+    state.promote("_DSF1234A.jpg", "_DSF1234C.jpg")
+
+    assert [content(state, f"_DSF1234{x}.jpg") for x in "ABC"] == [
+        "_DSF1234C.jpg", "_DSF1234A.jpg", "_DSF1234B.jpg",
+    ]
+
+
+def test_the_renders_follow_their_photos(state):
+    """Otherwise the grid would show the old lead until something re-rendered."""
+    carousel(state)
+
+    state.promote("_DSF1234A.jpg", "_DSF1234B.jpg")
+
+    assert state.processed_path("_DSF1234A.jpg").read_bytes() == b"render _DSF1234B.jpg"
+
+
+def test_the_post_keeps_its_caption_and_its_place_in_the_queue(state):
+    photo = carousel(state)
+    photo.caption = "Written already"
+
+    state.promote("_DSF1234A.jpg", "_DSF1234B.jpg")
+
+    assert state.order == ["_DSF1234A.jpg"]
+    assert state.photos["_DSF1234A.jpg"] is photo
+    assert photo.files == ["_DSF1234A.jpg", "_DSF1234B.jpg", "_DSF1234C.jpg"]
+
+
+def test_promoting_the_photo_that_already_leads_does_nothing(state):
+    carousel(state)
+
+    assert state.promote("_DSF1234A.jpg", "_DSF1234A.jpg") == []
+    assert content(state, "_DSF1234A.jpg") == "_DSF1234A.jpg"
+
+
+def test_promoting_a_photo_from_another_post_raises(state):
+    carousel(state)
+    add(state, "other.jpg")
+
+    with pytest.raises(KeyError):
+        state.promote("_DSF1234A.jpg", "other.jpg")
+
+
+def test_no_stray_temporaries_are_left_behind(state):
+    carousel(state)
+
+    state.promote("_DSF1234A.jpg", "_DSF1234C.jpg")
+
+    for folder in (state.cfg.paths.raw, state.cfg.paths.processed):
+        assert not [p.name for p in folder.iterdir() if p.name.startswith(".")]
