@@ -8,6 +8,16 @@
   - DSCF8375A.jpg
   - DSCF8375B.jpg
   - DSCF8375C.jpg
+- file: DSCF1091A.jpg
+  caption: Yosemite Falls, California (Apr, 2026)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: ready
+  files:
+  - DSCF1091A.jpg
+  - DSCF1091B.jpg
+  - DSCF1091C.jpg
 - file: DSCF0793A.jpg
   caption: Matterhorn, by dawn and dusk (Apr, 2026)
   caption_reviewed: true
@@ -154,16 +164,6 @@
   place: null
   location_id: null
   status: ready
-- file: DSCF1091A.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
-  files:
-  - DSCF1091A.jpg
-  - DSCF1091B.jpg
-  - DSCF1091C.jpg
 - file: _DSF4688A.jpg
   caption: ''
   caption_reviewed: false
