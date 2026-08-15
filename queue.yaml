@@ -17,14 +17,14 @@
   - DSCF0724A.jpg
   - DSCF0724B.jpg
 - file: DSCF4783.jpg
-  caption: ''
-  caption_reviewed: false
+  caption: The moon rising above the limestone cliffs of El Portrero Chico, Mexico (Oct, 2025)
+  caption_reviewed: true
   place: null
   location_id: null
   status: ready
 - file: DSCF5658.jpg
-  caption: ''
-  caption_reviewed: false
+  caption: Golden Spanish moss in climbing paradise El Salto, Mexico (Nov, 2025)
+  caption_reviewed: true
   place: null
   location_id: null
   status: ready
@@ -38,24 +38,33 @@
   - DSCF1091A.jpg
   - DSCF1091B.jpg
   - DSCF1091C.jpg
-- file: _DSF9230.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
 - file: _DSF9266A.jpg
-  caption: Leopard sitting upright against dark bush (Nov, 2023)
-  caption_reviewed: false
+  caption: The Masai Mara Leopard (Nov, 2023)
+  caption_reviewed: true
   place: null
   location_id: null
   status: ready
   files:
   - _DSF9266A.jpg
   - _DSF9266B.jpg
+- file: DSCF1107A.jpg
+  caption: A silhouette between rock and haze north of the polar circle (Sep, 2023)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: ready
+  files:
+  - DSCF1107A.jpg
+  - DSCF1107B.jpg
+- file: _DSF9230.jpg
+  caption: Walking away from the only lunch for miles (Nov, 2023)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: ready
 - file: _DSF5406.jpg
-  caption: ''
-  caption_reviewed: false
+  caption: Cape Town covered in a bank of clouds (Apr, 2024)
+  caption_reviewed: true
   place: null
   location_id: null
   status: ready
@@ -364,15 +373,6 @@
   place: null
   location_id: null
   status: ready
-- file: DSCF1107A.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
-  files:
-  - DSCF1107A.jpg
-  - DSCF1107B.jpg
 - file: DSCF0966.jpg
   caption: ''
   caption_reviewed: false
