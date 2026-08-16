@@ -3,10 +3,13 @@
   caption_reviewed: true
   place: null
   location_id: null
-  status: ready
+  status: posted
   files:
   - DSCF0793A.jpg
   - DSCF0793B.jpg
+  posted_at: '2026-08-16T12:12:36.701583+00:00'
+  media_id: '18348742144223885'
+  permalink: https://www.instagram.com/p/DcGb1qjkR6s/
 - file: DSCF0724A.jpg
   caption: Scandinavian Aurora over the treeline underneath the Milkyway (Sep, 2023)
   caption_reviewed: true
