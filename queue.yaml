@@ -24,7 +24,10 @@
   caption_reviewed: true
   place: null
   location_id: null
-  status: ready
+  status: posted
+  posted_at: '2026-09-06T18:15:22.139498+00:00'
+  media_id: '17994131621829162'
+  permalink: https://www.instagram.com/p/Dc9KDIIjeKK/
 - file: DSCF5658.jpg
   caption: Golden Spanish moss in climbing paradise El Salto, Mexico (Nov, 2025)
   caption_reviewed: true
