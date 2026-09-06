@@ -25,6 +25,7 @@ opaque container failure from Meta.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -289,12 +290,17 @@ def publish_next(
 
 def _mark_posted(state: State, photo, media_id: str, permalink: str, cfg) -> None:
     """Move the files, update the queue, commit. Never before the post is live."""
+    when = datetime.now(timezone.utc)
     for name in photo.files:
         src = state.processed_path(name)
         dst = cfg.paths.posted / src.name
         dst.parent.mkdir(parents=True, exist_ok=True)
         if src.is_file():
             src.replace(dst)
+            # A move keeps the mtime, which would be the moment the border was
+            # rendered — for a batch rendered in one sitting that says nothing
+            # about what was published when. The grid sorts on this.
+            os.utime(dst, (when.timestamp(), when.timestamp()))
 
     photo.status = STATUS_POSTED
     state.save()
@@ -305,7 +311,7 @@ def _mark_posted(state: State, photo, media_id: str, permalink: str, cfg) -> Non
             entry = {
                 **entry,
                 "status": STATUS_POSTED,
-                "posted_at": datetime.now(timezone.utc).isoformat(),
+                "posted_at": when.isoformat(),
                 "media_id": media_id,
                 "permalink": permalink,
             }

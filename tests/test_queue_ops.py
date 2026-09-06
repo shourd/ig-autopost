@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import dataclasses
+import os
+from datetime import datetime
 
 import pytest
+import yaml
 
 from app import state as state_module
 from app.state import STATUS_POSTED, Photo, State
@@ -22,8 +25,11 @@ def state(tmp_path, monkeypatch):
         raw=tmp_path / "raw",
         processed=tmp_path / "processed",
         removed=tmp_path / "removed",
+        posted=tmp_path / "posted",
+        history=tmp_path / "history",
+        queue=tmp_path / "queue.yaml",
     )
-    for folder in (paths.raw, paths.processed):
+    for folder in (paths.raw, paths.processed, paths.posted, paths.history):
         folder.mkdir(parents=True)
 
     blank = State.__new__(State)  # __init__ would scan the real photos/raw
@@ -260,3 +266,55 @@ def test_no_stray_temporaries_are_left_behind(state):
 
     for folder in (state.cfg.paths.raw, state.cfg.paths.processed):
         assert not [p.name for p in folder.iterdir() if p.name.startswith(".")]
+
+
+# --- the already-posted block ----------------------------------------------
+
+
+def publish(state, name, when, files=None, recorded=True):
+    """A post that has already gone out, with its file and its queue entry.
+
+    `recorded=False` is the backfill from the API: a file with no entry in
+    queue.yaml, carrying its post time on the mtime.
+    """
+    stamp = datetime.fromisoformat(when).timestamp()
+    folder = state.cfg.paths.posted if recorded else state.cfg.paths.history
+    for member in files or [name]:
+        path = folder / member
+        path.write_bytes(b"posted")
+        # Deliberately wrong on the file: this is the render time a move
+        # preserves, which is what the grid used to sort on.
+        os.utime(path, (stamp if not recorded else 0, stamp if not recorded else 0))
+    if recorded:
+        entry = {"file": name, "status": "posted", "posted_at": when}
+        if files:
+            entry["files"] = files
+        existing = yaml.safe_load(state.cfg.paths.queue.read_text()) if state.cfg.paths.queue.exists() else []
+        state.cfg.paths.queue.write_text(yaml.safe_dump((existing or []) + [entry], sort_keys=False))
+
+
+def test_the_grid_follows_the_real_publish_times(state):
+    """Not the file mtimes: moving a rendered file preserves its render time,
+    and a batch rendered in one sitting says nothing about publishing order."""
+    publish(state, "second.jpg", "2026-08-20T10:00:00+00:00")
+    publish(state, "newest.jpg", "2026-09-01T10:00:00+00:00")
+    publish(state, "oldest.jpg", "2026-08-15T10:00:00+00:00")
+
+    assert state.posted() == ["newest.jpg", "second.jpg", "oldest.jpg"]
+
+
+def test_the_backfill_still_sorts_on_its_mtime(state):
+    """Photos downloaded from the API have no queue entry; src.history stamps
+    the real post time onto the file instead."""
+    publish(state, "mine.jpg", "2026-08-20T10:00:00+00:00")
+    publish(state, "2024-01-28_abc.jpg", "2024-01-28T10:00:00+00:00", recorded=False)
+    publish(state, "2026-08-25_xyz.jpg", "2026-08-25T10:00:00+00:00", recorded=False)
+
+    assert state.posted() == ["2026-08-25_xyz.jpg", "mine.jpg", "2024-01-28_abc.jpg"]
+
+
+def test_a_published_carousel_takes_one_square(state):
+    publish(state, "A_A.jpg", "2026-09-01T10:00:00+00:00", files=["A_A.jpg", "A_B.jpg"])
+    publish(state, "solo.jpg", "2026-08-01T10:00:00+00:00")
+
+    assert state.posted() == ["A_A.jpg", "solo.jpg"]

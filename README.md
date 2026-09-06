@@ -100,6 +100,8 @@ already-published block.
 - **Already-posted photos** appear below the queue, marked with a ✓. They come
   from `photos/posted/` — the publisher moves files there as posts go out. To
   see the queue against your real profile, drop existing exports in there too.
+  They're ordered by `posted_at` in `queue.yaml`, falling back to the file's
+  mtime for the API backfill, which `src.history` stamps on download.
 - Drag to reorder; neighbours slide out of the way once the cursor is past their
   middle. Order is saved as you drop.
 - **Send to start of the queue** puts the selected photo first, instead of

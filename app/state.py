@@ -126,8 +126,8 @@ class State:
         the API (git-ignored, display-only). The grid doesn't care which is
         which — both are simply "already posted".
 
-        Ordering is by mtime, which `src.history` stamps to each post's real
-        publish time so the backfilled grid matches Instagram's own.
+        Ordering is by the moment each post actually went live — see
+        `_publish_times`.
         """
         files = [
             p
@@ -138,12 +138,38 @@ class State:
             and not p.name.startswith(".")
             and p.name not in RESERVED  # sidecars, not posts
         ]
-        files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        live = self._publish_times()
+        files.sort(key=lambda p: live.get(p.name) or p.stat().st_mtime, reverse=True)
         names = [p.name for p in files]
         # A published carousel occupies one square on the profile, so it gets
         # one cell here too — same rule as the queue above it.
         followers = {n for members in carousel_groups(names).values() for n in members}
         return [n for n in names if n not in followers]
+
+    def _publish_times(self) -> dict[str, float]:
+        """When each already-posted photo went live, by filename.
+
+        queue.yaml is the record: `posted_at` is written the moment a post goes
+        live, and it's committed, so it still holds in a fresh clone where every
+        file has the checkout time for an mtime.
+
+        The fallback is the mtime, which is right for the backfill —
+        `src.history` stamps those to the real post time on download. It is not
+        right for anything this pipeline published: moving a file preserves its
+        mtime, so a post carries the moment its border was *rendered*, and a
+        batch rendered in one go comes out in essentially arbitrary order.
+        """
+        if not self.cfg.paths.queue.exists():
+            return {}
+        times: dict[str, float] = {}
+        for entry in yaml.safe_load(self.cfg.paths.queue.read_text()) or []:
+            when = entry.get("posted_at")
+            if not when:
+                continue
+            stamp = datetime.fromisoformat(when).timestamp()
+            for name in entry.get("files") or [entry["file"]]:
+                times[name] = stamp
+        return times
 
     def posted_path(self, name: str) -> Path | None:
         """Locate an already-posted image across both folders."""
