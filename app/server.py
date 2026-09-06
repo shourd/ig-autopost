@@ -316,10 +316,7 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/order":
                 with _lock:
-                    known = set(_state.photos)
-                    _state.order = [n for n in body["order"] if n in known]
-                    _state.order += [n for n in known if n not in _state.order]
-                    _state.save()
+                    _state.reorder(body["order"])
                 return self._json({"ok": True})
 
             if path == "/api/place":

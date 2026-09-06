@@ -325,6 +325,35 @@ class State:
         self.order.sort(key=lambda n: (self.photos[n].date is None, self.photos[n].date or "", n))
         self.save()
 
+    def reorder(self, names: list[str]) -> None:
+        """Apply an order for the posts the app can see.
+
+        The app draws the queue, not the history, so the order it sends back
+        names only the unpublished posts. Anything it didn't mention keeps the
+        slot it holds now — appending the rest instead walked the already-posted
+        entries to the bottom of queue.yaml, one drag at a time.
+        """
+        wanted = [n for n in names if n in self.photos]
+        moving = set(wanted)
+        dealt = iter(wanted)
+
+        out: list[str] = []
+        for name in self.order:
+            if name not in self.photos:
+                continue
+            if name in moving:
+                # A slot the app owns takes the next name it asked for. If it
+                # sent fewer than it holds, the leftover slot simply closes up.
+                nxt = next(dealt, None)
+                if nxt is not None:
+                    out.append(nxt)
+            else:
+                out.append(name)
+        out += list(dealt)  # names the app knew about before this state did
+        out += [n for n in self.photos if n not in out]
+        self.order = out
+        self.save()
+
     def shuffle(self) -> None:
         """Deal the queue into a random order.
 

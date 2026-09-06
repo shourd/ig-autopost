@@ -318,3 +318,39 @@ def test_a_published_carousel_takes_one_square(state):
     publish(state, "solo.jpg", "2026-08-01T10:00:00+00:00")
 
     assert state.posted() == ["A_A.jpg", "solo.jpg"]
+
+
+# --- the app pushing an order back -----------------------------------------
+
+
+def test_a_reorder_only_moves_what_the_app_sent(state):
+    """The app draws the queue, not the history, so its order names only the
+    unpublished posts — and the published ones must not drift because of it."""
+    add(state, "a.jpg")
+    add(state, "posted.jpg").status = STATUS_POSTED
+    add(state, "b.jpg")
+    add(state, "c.jpg")
+
+    state.reorder(["c.jpg", "b.jpg", "a.jpg"])
+
+    assert state.order == ["c.jpg", "posted.jpg", "b.jpg", "a.jpg"]
+
+
+def test_a_photo_missing_from_the_order_still_lands(state):
+    """`photos` and `order` can drift apart for a moment; nothing may be lost."""
+    add(state, "a.jpg")
+    add(state, "b.jpg")
+    state.order.remove("b.jpg")
+
+    state.reorder(["b.jpg", "a.jpg"])
+
+    assert state.order == ["b.jpg", "a.jpg"]
+
+
+def test_names_the_state_does_not_know_are_ignored(state):
+    add(state, "a.jpg")
+    add(state, "b.jpg")
+
+    state.reorder(["b.jpg", "ghost.jpg", "a.jpg"])
+
+    assert state.order == ["b.jpg", "a.jpg"]
