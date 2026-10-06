@@ -75,6 +75,43 @@ Reminders for your terminal. Set `reminder_apple_list` to put them in a specific
 list, or leave it null for the default one. Todoist needs `TODOIST_API_TOKEN` in
 `.env`; with the token absent that half is skipped and the reminders still work.
 
+## The weekly check
+
+```bash
+uv run python -m src.healthcheck            # run it now
+uv run python -m src.healthcheck --install  # or every Monday at 09:00
+```
+
+This project fails quietly. A Meta token was invalidated on ~22 September 2026
+and nothing said so; it surfaced two weeks and six missed slots later, by trying
+to post. The check is the answer to that: it proves the token still works by
+calling the API (presence proves nothing — the dead token sat in `.env` the
+whole time, right length and all), proves Meta can still fetch the next photo,
+says how many days of token and of queue are left, **and rewrites the
+reminders**.
+
+That last part is the half that keeps the posting happening. The reminder window
+is only the next `reminder_count` posts, and until now it was refilled only by
+pressing Save. Stop pressing Save and the nudges run out — which is exactly what
+happened. At three posts a week a four-deep window needs refilling inside nine
+days, so a weekly run keeps it full with room to spare.
+
+Anything wrong lands in the Reminders app as **"ig-autopost needs attention"**,
+due immediately, carrying the failure and the command that fixes it. It's the
+one channel already proven to reach the phone; a log file nobody opens would
+repeat the original mistake. A later clean run deletes it, so a fixed problem
+stops nagging.
+
+`--install` writes a launchd agent — not cron, and not a GitHub Action: the
+reminders live in the Reminders app on this Mac, so no runner elsewhere can
+write them. A run missed with the laptop shut fires when it next wakes.
+
+```bash
+launchctl print "gui/$(id -u)/com.snapposter.healthcheck" | grep -E "runs|last exit"
+cat ~/Library/Logs/ig-autopost-healthcheck.log
+uv run python -m src.healthcheck --uninstall
+```
+
 ## Setup
 
 ```bash

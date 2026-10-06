@@ -20,6 +20,7 @@ lands in shell history.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from getpass import getpass
 
 import requests
@@ -170,7 +171,15 @@ def main() -> None:
         token, ig_id, kind = _instagram_login()
 
     print(f"\n  Verified: publishing as IG user {ig_id} via a '{kind}' token.\n")
-    _write_env(META_ACCESS_TOKEN=token, IG_USER_ID=ig_id, META_TOKEN_KIND=kind)
+    # The issue date is written down because the API won't give it back:
+    # debug_token needs an app secret this setup doesn't have. src.healthcheck
+    # counts the 60 days from here and warns before they run out.
+    _write_env(
+        META_ACCESS_TOKEN=token,
+        IG_USER_ID=ig_id,
+        META_TOKEN_KIND=kind,
+        META_TOKEN_ISSUED=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    )
 
     print(
         "\n  Add the same values as GitHub repo secrets:\n"

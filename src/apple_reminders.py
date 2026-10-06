@@ -36,6 +36,11 @@ WAITING = "permission dialog unanswered"
 TITLE_PREFIX = "Post "
 TITLE_SUFFIX = " to Instagram"
 
+# The health check's own reminder, for when the pipeline needs a human. A fixed
+# title, so each run replaces last week's rather than stacking them up — and
+# distinct from the post nudges above, so neither sweep eats the other.
+ALERT_TITLE = "ig-autopost needs attention"
+
 
 def title_for(filename: str) -> str:
     return f"{TITLE_PREFIX}{filename}{TITLE_SUFFIX}"
@@ -54,7 +59,7 @@ def _quote(text: str) -> str:
     return escaped.replace("\n", "\\n").replace("\r", "")
 
 
-def _script(nudges: list[Nudge], list_name: str | None) -> str:
+def _preamble(list_name: str | None) -> list[str]:
     # `current date` minus the current epoch gives a date object sitting at the
     # epoch in local time; adding a timestamp to it lands on the right instant
     # without ever formatting or parsing a date string.
@@ -72,6 +77,11 @@ def _script(nudges: list[Nudge], list_name: str | None) -> str:
         ]
     else:
         lines.append("\tset theList to default list")
+    return lines
+
+
+def _script(nudges: list[Nudge], list_name: str | None) -> str:
+    lines = _preamble(list_name)
 
     # Sweep every reminder this app has ever made before writing the current
     # ones. Deleting only the titles being rewritten would strand the rest: a
@@ -136,3 +146,37 @@ def sync(nudges: list[Nudge], list_name: str | None = None, run=_run) -> list[st
             "this app. Nothing else is affected."
         ]
     return [f"! Apple Reminders failed: {output.splitlines()[-1] if output else 'unknown'}"]
+
+
+def _alert_script(body: str | None, list_name: str | None) -> str:
+    lines = _preamble(list_name)
+    # Swept first either way: a problem that has been fixed should take its
+    # reminder with it, or the phone keeps insisting on a job already done.
+    lines.append(
+        f'\tdelete (every reminder of theList whose completed is false '
+        f'and name is "{ALERT_TITLE}")'
+    )
+    if body:
+        # Due now — the whole point is that it is noticed today, not at a slot.
+        lines.append(
+            f'\tmake new reminder at end of theList with properties '
+            f'{{name:"{ALERT_TITLE}", body:"{_quote(body)}", '
+            f'remind me date:(current date)}}'
+        )
+    lines.append("end tell")
+    return "\n".join(lines)
+
+
+def alert(body: str | None, list_name: str | None = None, run=_run) -> list[str]:
+    """Raise (or clear) the health check's reminder. Returns log lines.
+
+    `body` of None means everything passed: the sweep still runs, which is how
+    last week's alert disappears once the problem is dealt with.
+    """
+    if sys.platform != "darwin":
+        return ["! Apple Reminders skipped (not macOS)"]
+
+    ok, output = run(_alert_script(body, list_name))
+    if ok:
+        return [f'Reminders alert: "{ALERT_TITLE}" raised' if body else "Reminders alert: clear"]
+    return [f"! could not write the alert reminder: {output.splitlines()[-1] if output else 'unknown'}"]
