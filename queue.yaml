@@ -1,5 +1,15 @@
+- file: DSCF8375A.jpg
+  caption: Peaceful Swedish coast of Fjällbacka (Sep, 2024)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: posted
+  files:
+  - DSCF8375A.jpg
+  - DSCF8375B.jpg
+  - DSCF8375C.jpg
 - file: DSCF0793A.jpg
-  caption: Matterhorn, by dawn and dusk (Apr, 2026)
+  caption: Two faces of the Matterhorn, by dawn and dusk (Apr, 2026)
   caption_reviewed: true
   place: null
   location_id: null
@@ -7,33 +17,103 @@
   files:
   - DSCF0793A.jpg
   - DSCF0793B.jpg
-  posted_at: '2026-08-16T12:12:36.701583+00:00'
-  media_id: '18348742144223885'
-  permalink: https://www.instagram.com/p/DcGb1qjkR6s/
-- file: DSCF0724A.jpg
-  caption: Scandinavian Aurora over the treeline underneath the Milkyway (Sep, 2023)
-  caption_reviewed: true
-  place: null
-  location_id: null
-  status: ready
-  files:
-  - DSCF0724A.jpg
-  - DSCF0724B.jpg
-- file: DSCF4783.jpg
-  caption: The moon rising above the limestone cliffs of El Portrero Chico, Mexico (Oct, 2025)
+- file: _DSF4722A.jpg
+  caption: Misty Wild Coast morning (Apr, 2024)
   caption_reviewed: true
   place: null
   location_id: null
   status: posted
-  posted_at: '2026-09-06T18:15:22.139498+00:00'
-  media_id: '17994131621829162'
-  permalink: https://www.instagram.com/p/Dc9KDIIjeKK/
-- file: DSCF5658.jpg
-  caption: Golden Spanish moss in climbing paradise El Salto, Mexico (Nov, 2025)
+  files:
+  - _DSF4722A.jpg
+  - _DSF4722B.jpg
+- file: DSCF6579A.jpg
+  caption: A Patagonian gaucho herding his sheep in the Valle de los Cóndores, Chile (Dec, 2025)
   caption_reviewed: true
   place: null
   location_id: null
-  status: ready
+  status: posted
+  files:
+  - DSCF6579A.jpg
+  - DSCF6579B.jpg
+  - DSCF6579C.jpg
+- file: DSCF6431A.jpg
+  caption: 'Hidden baños azules in one of the coolest canyons in Chile. Incredible to be completely alone here. Created by volcanic minerals like calcium carbonate shaping unique natural stone pools. And not unimportantly there''s excellent climbing.
+
+    (Dec, 2025)'
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: posted
+  files:
+  - DSCF6431A.jpg
+  - DSCF6431B.jpg
+- file: DSCF9700A.jpg
+  caption: Textures of Patagonia (Feb, 2026)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: posted
+  files:
+  - DSCF9700A.jpg
+  - DSCF9700B.jpg
+  - DSCF9700C.jpg
+  - DSCF9700D.jpg
+  - DSCF9700E.jpg
+  - DSCF9700F.jpg
+- file: DSCF1107A.jpg
+  caption: Between rock and haze north of Sweden's polar circle (Sep, 2023)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: posted
+  files:
+  - DSCF1107A.jpg
+  - DSCF1107B.jpg
+- file: DSCF4783.jpg
+  caption: The moon rising above the 1000m vertical limestone cliffs of El Portrero Chico, Mexico (Oct, 2025)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: posted
+- file: DSCF5806.jpg
+  caption: Highlining 100 meters above the canyon in El Salto, Mexico (Nov, 2025)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: posted
+- file: DSCF0653.jpg
+  caption: Snowy veils (Feb, 2025)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: posted
+- file: DSCF0013.jpg
+  caption: Maja above the shining sand (Jan, 2025)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: posted
+- file: _DSF8735A.jpg
+  caption: Two manes meeting in Tsavo National Park
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: posted
+  files:
+  - _DSF8735A.jpg
+  - _DSF8735B.jpg
+- file: _DSF4309.jpg
+  caption: A kid pointing us in the right direction, up north, in remote northern Kenya (Mar, 2024)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: posted
+- file: DSCF3389.jpg
+  caption: Grande Grotta on Kalymnos. With a few of the most incredible climbs of my life. (Oct, 2025)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: posted
 - file: DSCF1091A.jpg
   caption: Yosemite Falls, California (Apr, 2026)
   caption_reviewed: true
@@ -44,11 +124,95 @@
   - DSCF1091A.jpg
   - DSCF1091B.jpg
   - DSCF1091C.jpg
-  posted_at: '2026-10-23T09:06:54.470041+00:00'
-  media_id: '18110954543129257'
-  permalink: https://www.instagram.com/p/De1Mo9njWr7/
+- file: DSCF5660.jpg
+  caption: Tal in a hidden cave around El Salto. Resting in between tries of a massively overhanging 7c cave route (Nov, 2025)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: ready
+- file: _DSF2046A.jpg
+  caption: ''
+  caption_reviewed: false
+  place: null
+  location_id: null
+  status: ready
+  files:
+  - _DSF2046A.jpg
+  - _DSF2046B.jpg
+- file: DSCF3760.jpg
+  caption: ''
+  caption_reviewed: false
+  place: null
+  location_id: null
+  status: ready
+- file: DSCF1244.jpg
+  caption: ''
+  caption_reviewed: false
+  place: null
+  location_id: null
+  status: ready
+- file: _DSF22713.jpg
+  caption: ''
+  caption_reviewed: false
+  place: null
+  location_id: null
+  status: ready
+- file: DSCF0966.jpg
+  caption: ''
+  caption_reviewed: false
+  place: null
+  location_id: null
+  status: ready
+- file: DSCF8171.jpg
+  caption: ''
+  caption_reviewed: false
+  place: null
+  location_id: null
+  status: ready
+- file: DSCF9240.jpg
+  caption: ''
+  caption_reviewed: false
+  place: null
+  location_id: null
+  status: ready
+- file: DSCF5658.jpg
+  caption: Golden Spanish moss in climbing paradise El Salto, Mexico (Nov, 2025)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: ready
+- file: _DSF8017.jpg
+  caption: One flamingo decided to skip the queue (Oct, 2023)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: ready
+- file: DSCF0724A.jpg
+  caption: Scandinavian Aurora over the treeline underneath the Milkyway (Sep, 2023)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: ready
+  files:
+  - DSCF0724A.jpg
+  - DSCF0724B.jpg
+- file: _DSF9230.jpg
+  caption: Walking away from the only lunch for miles (Nov, 2023)
+  caption_reviewed: true
+  place: null
+  location_id: null
+  status: ready
+- file: _DSF2761A.jpg
+  caption: ''
+  caption_reviewed: false
+  place: null
+  location_id: null
+  status: ready
+  files:
+  - _DSF2761A.jpg
+  - _DSF2761B.jpg
 - file: _DSF9266A.jpg
-  caption: The Masai Mara Leopard (Nov, 2023)
+  caption: Incredible serendipitous encounter at the end of the day while driving back to camp (Nov, 2023)
   caption_reviewed: true
   place: null
   location_id: null
@@ -56,39 +220,12 @@
   files:
   - _DSF9266A.jpg
   - _DSF9266B.jpg
-- file: DSCF1107A.jpg
-  caption: A silhouette between rock and haze north of the polar circle (Sep, 2023)
-  caption_reviewed: true
-  place: null
-  location_id: null
-  status: posted
-  files:
-  - DSCF1107A.jpg
-  - DSCF1107B.jpg
-  posted_at: '2026-09-01T14:24:18.543080+00:00'
-  media_id: '18092043809278309'
-  permalink: https://www.instagram.com/p/Dcv3omuEdWy/
-- file: _DSF9230.jpg
-  caption: Walking away from the only lunch for miles (Nov, 2023)
-  caption_reviewed: true
-  place: null
-  location_id: null
-  status: ready
 - file: _DSF5406.jpg
   caption: Cape Town covered in a bank of clouds (Apr, 2024)
   caption_reviewed: true
   place: null
   location_id: null
   status: ready
-- file: DSCF5806.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: posted
-  posted_at: '2026-09-10T20:04:52.608086+00:00'
-  media_id: '18079657169706645'
-  permalink: https://www.instagram.com/p/DdHpwU8lS4a/
 - file: DSCF8046.jpg
   caption: ''
   caption_reviewed: false
@@ -149,15 +286,6 @@
   files:
   - _DSF4894A.jpg
   - _DSF4894B.jpg
-- file: DSCF0653.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: posted
-  posted_at: '2026-09-22T13:41:29.900927+00:00'
-  media_id: '18121759789909511'
-  permalink: https://www.instagram.com/p/Ddl3bIEDVZa/
 - file: _DSF2970A.jpg
   caption: ''
   caption_reviewed: false
@@ -186,19 +314,6 @@
   files:
   - DSCF6365A.jpg
   - DSCF6365B.jpg
-- file: DSCF6579A.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: posted
-  files:
-  - DSCF6579A.jpg
-  - DSCF6579B.jpg
-  - DSCF6579C.jpg
-  posted_at: '2026-08-20T08:01:53.024395+00:00'
-  media_id: '18107111135148903'
-  permalink: https://www.instagram.com/p/DcQSUzNEXhC/
 - file: IMG_3075.jpg
   caption: ''
   caption_reviewed: false
@@ -216,37 +331,12 @@
   - _DSF4688B.jpg
   - _DSF4688C.jpg
   - _DSF4688D.jpg
-- file: _DSF4309.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: posted
-  posted_at: '2026-10-11T07:16:30.878493+00:00'
-  media_id: '18096435143226863'
-  permalink: https://www.instagram.com/p/DeWGeJ-DJHh/
 - file: IMG_6926.jpg
   caption: ''
   caption_reviewed: false
   place: null
   location_id: null
   status: ready
-- file: DSCF9700A.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: posted
-  files:
-  - DSCF9700A.jpg
-  - DSCF9700B.jpg
-  - DSCF9700C.jpg
-  - DSCF9700D.jpg
-  - DSCF9700E.jpg
-  - DSCF9700F.jpg
-  posted_at: '2026-08-28T08:21:03.971581+00:00'
-  media_id: '18116194607294491'
-  permalink: https://www.instagram.com/p/Dck6327iP_m/
 - file: _DSF9916.jpg
   caption: ''
   caption_reviewed: false
@@ -259,15 +349,6 @@
   place: null
   location_id: null
   status: ready
-- file: _DSF2761A.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
-  files:
-  - _DSF2761A.jpg
-  - _DSF2761B.jpg
 - file: DSCF8855A.jpg
   caption: ''
   caption_reviewed: false
@@ -277,12 +358,6 @@
   files:
   - DSCF8855A.jpg
   - DSCF8855B.jpg
-- file: DSCF3760.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
 - file: IMG_0506.jpg
   caption: ''
   caption_reviewed: false
@@ -307,15 +382,6 @@
   place: null
   location_id: null
   status: ready
-- file: _DSF2046A.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
-  files:
-  - _DSF2046A.jpg
-  - _DSF2046B.jpg
 - file: DSCF8320.jpg
   caption: ''
   caption_reviewed: false
@@ -325,12 +391,6 @@
 - file: 1090 - 27a.jpg
   caption: The mown strip suggests someone expected visitors (Jul, 2026)
   caption_reviewed: true
-  place: null
-  location_id: null
-  status: ready
-- file: _DSF22713.jpg
-  caption: ''
-  caption_reviewed: false
   place: null
   location_id: null
   status: ready
@@ -394,19 +454,13 @@
   place: null
   location_id: null
   status: ready
-- file: DSCF8171.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
-- file: DSCF0966.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
 - file: IMG_0116.jpg
+  caption: ''
+  caption_reviewed: false
+  place: null
+  location_id: null
+  status: ready
+- file: IMG_1968.jpg
   caption: ''
   caption_reviewed: false
   place: null
@@ -421,36 +475,12 @@
   files:
   - DSCF7999A.jpg
   - DSCF7999B.jpg
-- file: IMG_1968.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
-- file: DSCF0013.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: posted
-  posted_at: '2026-10-06T13:10:18.983375+00:00'
-  media_id: '18142301629607207'
-  permalink: https://www.instagram.com/p/DeJ2-lriNiE/
 - file: 202037000035.jpg
   caption: ''
   caption_reviewed: false
   place: null
   location_id: null
   status: ready
-- file: DSCF3389.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: posted
-  posted_at: '2026-10-21T10:04:22.490917+00:00'
-  media_id: '18076262420757274'
-  permalink: https://www.instagram.com/p/DewJoL8DTq-/
 - file: _DSF2088-2.jpg
   caption: ''
   caption_reviewed: false
@@ -500,7 +530,7 @@
   location_id: null
   status: ready
 - file: IMG_3139.jpg
-  caption: ''
+  caption: A man walks past a pale blue house (Feb, 2026)
   caption_reviewed: false
   place: null
   location_id: null
@@ -511,18 +541,6 @@
   place: null
   location_id: null
   status: ready
-- file: _DSF4722A.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: posted
-  files:
-  - _DSF4722A.jpg
-  - _DSF4722B.jpg
-  posted_at: '2026-08-18T14:48:26.877067+00:00'
-  media_id: '17866463727640595'
-  permalink: https://www.instagram.com/p/DcL3QkBkdfh/
 - file: DSCF8907A.jpg
   caption: ''
   caption_reviewed: false
@@ -532,12 +550,6 @@
   files:
   - DSCF8907A.jpg
   - DSCF8907B.jpg
-- file: DSCF5660.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
 - file: _DSF5141A.jpg
   caption: ''
   caption_reviewed: false
@@ -547,18 +559,6 @@
   files:
   - _DSF5141A.jpg
   - _DSF5141B.jpg
-- file: DSCF9240.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
-- file: DSCF1244.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
 - file: DSCF8039.jpg
   caption: ''
   caption_reviewed: false
@@ -581,18 +581,6 @@
   - DSCF8418A.jpg
   - DSCF8418B.jpg
   - DSCF8418C.jpg
-- file: DSCF6431A.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: posted
-  files:
-  - DSCF6431A.jpg
-  - DSCF6431B.jpg
-  posted_at: '2026-08-25T20:07:04.687750+00:00'
-  media_id: '18174054052436492'
-  permalink: https://www.instagram.com/p/DcedSdylgD9/
 - file: _DSF2026.jpg
   caption: ''
   caption_reviewed: false
@@ -606,7 +594,7 @@
   location_id: null
   status: ready
 - file: IMG_2333.jpg
-  caption: ''
+  caption: Sitting above a glacier camp of yellow tents (May, 2019)
   caption_reviewed: false
   place: null
   location_id: null
@@ -617,26 +605,8 @@
   place: null
   location_id: null
   status: ready
-- file: _DSF8735A.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: posted
-  files:
-  - _DSF8735A.jpg
-  - _DSF8735B.jpg
-  posted_at: '2026-10-09T13:46:50.272624+00:00'
-  media_id: '17902581486666050'
-  permalink: https://www.instagram.com/p/DeRpjgeDGBd/
-- file: _DSF8017.jpg
-  caption: ''
-  caption_reviewed: false
-  place: null
-  location_id: null
-  status: ready
 - file: DSCF3727.jpg
-  caption: ''
+  caption: A climber on the overhang above the sea (Oct, 2025)
   caption_reviewed: false
   place: null
   location_id: null
@@ -647,14 +617,3 @@
   place: null
   location_id: null
   status: ready
-- file: DSCF8375A.jpg
-  caption: Peaceful Swedish coast of Fjällbacka (Sep, 2024)
-  caption_reviewed: true
-  place: null
-  location_id: null
-  status: posted
-  files:
-  - DSCF8375A.jpg
-  - DSCF8375B.jpg
-  - DSCF8375C.jpg
-  posted_at: '2026-08-15T10:31:42+00:00'
