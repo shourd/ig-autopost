@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import types
 from types import SimpleNamespace
 
 import pytest
@@ -250,3 +251,65 @@ def test_no_token_is_a_note_not_a_failure(monkeypatch):
     assert reminders.sync(state, url_for) == [
         "Todoist skipped (no TODOIST_API_TOKEN in .env)"
     ]
+
+
+# --- stray Todoist tasks ---------------------------------------------------
+
+
+class FakeTasksApi:
+    """Just enough of the tasks API to watch what gets deleted."""
+
+    def __init__(self, tasks):
+        self.tasks = tasks
+        self.deleted = []
+
+    def get(self, url, headers=None, params=None, timeout=None):
+        return types.SimpleNamespace(
+            status_code=200, raise_for_status=lambda: None,
+            json=lambda: {"results": self.tasks, "next_cursor": None},
+        )
+
+    def delete(self, url, headers=None, timeout=None):
+        self.deleted.append(url.rsplit("/", 1)[1])
+        return types.SimpleNamespace(status_code=204, raise_for_status=lambda: None)
+
+
+def test_a_task_the_state_lost_track_of_is_deleted(monkeypatch):
+    """An id that was never saved can't be updated or cleared by id, so the
+    next run would make a second task for the same photo."""
+    fake = FakeTasksApi([
+        {"id": "111", "content": "Post a.jpg to Instagram"},   # just written
+        {"id": "222", "content": "Post b.jpg to Instagram"},   # orphan
+    ])
+    monkeypatch.setattr(reminders, "requests", fake)
+
+    gone, problem = reminders._sweep("token", written={"111"})
+
+    assert (gone, problem) == (1, None)
+    assert fake.deleted == ["222"]
+
+
+def test_the_sweep_leaves_everything_else_alone(monkeypatch):
+    """It shares a Todoist account with the rest of Sjoerd's life."""
+    fake = FakeTasksApi([
+        {"id": "1", "content": "Buy milk"},
+        {"id": "2", "content": "Post the letter"},            # prefix only
+        {"id": "3", "content": "Reply to Instagram"},         # suffix only
+    ])
+    monkeypatch.setattr(reminders, "requests", fake)
+
+    gone, _ = reminders._sweep("token", written=set())
+
+    assert (gone, fake.deleted) == (0, [])
+
+
+def test_a_todoist_outage_during_the_sweep_is_reported_not_raised(monkeypatch):
+    class Dead(FakeTasksApi):
+        def get(self, *a, **k):
+            raise reminders.RequestException("down")
+
+    monkeypatch.setattr(reminders, "requests", Dead([]))
+
+    gone, problem = reminders._sweep("token", written=set())
+
+    assert gone == 0 and "sweeping stray" in problem

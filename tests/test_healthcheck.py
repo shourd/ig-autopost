@@ -62,10 +62,11 @@ def test_an_unrecorded_issue_date_is_not_a_failure(issued):
 # --- queue -----------------------------------------------------------------
 
 
-def fake_state(statuses, slots=3):
+def fake_state(statuses, slots=3, saves=None):
     photos = [types.SimpleNamespace(status=s, file=f"{i}.jpg") for i, s in enumerate(statuses)]
     return types.SimpleNamespace(
         ordered=lambda: photos,
+        save=lambda: (saves if saves is not None else []).append(True),
         cfg=types.SimpleNamespace(schedule=types.SimpleNamespace(slots=[0] * slots)),
     )
 
@@ -109,6 +110,18 @@ def test_both_channels_are_reported_separately(monkeypatch):
     checks = healthcheck.refresh_reminders(fake_state([]))
 
     assert [c.ok for c in checks] == [False, True]
+
+
+def test_the_new_task_ids_are_written_down(monkeypatch):
+    """The Todoist id is the only handle on a task. Lose it and the next run
+    makes a second task and abandons the first — which is what reached the
+    phone twice."""
+    monkeypatch.setattr("src.reminders.sync", lambda *a: ["Todoist: 4 new, 0 updated, 0 cleared"])
+    saves = []
+
+    healthcheck.refresh_reminders(fake_state([], saves=saves))
+
+    assert saves == [True]
 
 
 def test_a_crash_in_the_sync_does_not_take_the_check_down(monkeypatch):

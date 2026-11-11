@@ -96,6 +96,13 @@ pressing Save. Stop pressing Save and the nudges run out — which is exactly wh
 happened. At three posts a week a four-deep window needs refilling inside nine
 days, so a weekly run keeps it full with room to spare.
 
+Todoist tasks are addressed by id, and the id only survives because the run
+writes it down — a run that creates a task and forgets the id can never update
+or clear it, and the next run makes a second task for the same photo. That is
+how duplicates reached the phone through October. The sync now also sweeps by
+title, the way the Reminders side always has, so a lost id costs one stray week
+rather than forever.
+
 Anything wrong lands in the Reminders app as **"ig-autopost needs attention"**,
 due immediately, carrying the failure and the command that fixes it. It's the
 one channel already proven to reach the phone; a log file nobody opens would

@@ -206,9 +206,63 @@ def _todoist(state, posts, cfg) -> list[str]:
             log.append(f"! clearing reminder for {photo.file} failed: {exc}")
         photo.reminder_id = None
 
+    # Belt and braces: anything wearing this app's title that isn't one of the
+    # tasks just written is a stray, and gets deleted. The id in `reminder_id`
+    # is the only handle on a task, so a run that creates one and then fails to
+    # save state orphans it permanently — it can never be updated or cleared,
+    # and the next run makes a second task for the same photo. That is exactly
+    # how a duplicate reached the phone. Addressing by title as well means a
+    # lost id costs one stray week at most, the same way the Reminders sweep
+    # already works.
+    written = {str(photo.reminder_id) for photo, _, _ in posts if photo.reminder_id}
+    strays, problem = _sweep(token, written)
+    removed += strays
+    if problem:
+        log.append(problem)
+
     parts = [f"{created} new", f"{updated} updated", f"{removed} cleared"]
     log.insert(0, f"Todoist: {', '.join(parts)}")
     return log
+
+
+def _sweep(token: str, written: set[str]) -> tuple[int, str | None]:
+    """Delete tasks titled like this app's but not among the ones just written.
+
+    The title template is `title_for`'s, which nothing typed by hand is going
+    to collide with — it names a specific file in photos/raw.
+    """
+    from src.apple_reminders import TITLE_PREFIX, TITLE_SUFFIX
+
+    headers = _headers(token)
+    try:
+        tasks, cursor = [], None
+        while True:
+            resp = requests.get(
+                API, headers=headers,
+                params={"limit": 200, **({"cursor": cursor} if cursor else {})},
+                timeout=TIMEOUT,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+            page = payload.get("results", payload) if isinstance(payload, dict) else payload
+            tasks += page
+            cursor = payload.get("next_cursor") if isinstance(payload, dict) else None
+            if not cursor:
+                break
+
+        gone = 0
+        for task in tasks:
+            name = task.get("content", "")
+            if not (name.startswith(TITLE_PREFIX) and name.endswith(TITLE_SUFFIX)):
+                continue
+            if str(task["id"]) in written:
+                continue
+            resp = requests.delete(f"{API}/{task['id']}", headers=headers, timeout=TIMEOUT)
+            if resp.status_code in (200, 204, 404):
+                gone += 1
+    except (RequestException, KeyError, ValueError) as exc:
+        return 0, f"! sweeping stray Todoist tasks failed: {exc}"
+    return gone, None
 
 
 def main() -> None:

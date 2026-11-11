@@ -154,6 +154,11 @@ def refresh_reminders(state) -> list[Check]:
 
     try:
         log = reminders.sync(state, image_url)
+        # Not optional. `sync` hands each photo the id of its Todoist task, and
+        # that id is the only way to update or delete the task later. Leaving it
+        # unsaved meant every weekly run created a second task and abandoned the
+        # first — the app's own Save has always done this; this didn't.
+        state.save()
     except Exception as exc:  # a reminder problem must not take the check down
         return [Check(False, "Reminders", f"{type(exc).__name__}: {exc}",
                       "The reminder sync failed; run: uv run python -m src.reminders")]
