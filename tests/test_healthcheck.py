@@ -166,3 +166,17 @@ def test_the_raised_alert_is_reported_by_name(monkeypatch):
 
     assert ALERT_TITLE in seen[0]
     assert out == [f'Reminders alert: "{ALERT_TITLE}" raised']
+
+
+def test_the_free_plan_notice_is_news_not_a_failure(monkeypatch):
+    """It is a standing fact about the plan. Raised weekly it would be exactly
+    the kind of repeat notification this was meant to stop."""
+    from src import reminders
+
+    monkeypatch.setattr("src.reminders.sync",
+                        lambda *a: ["Todoist: 0 new, 4 updated, 0 cleared", reminders.PLAN_NOTICE])
+
+    checks = healthcheck.refresh_reminders(fake_state([]))
+
+    assert [c.ok for c in checks] == [True, True]
+    assert "paid Todoist plan" in checks[1].detail

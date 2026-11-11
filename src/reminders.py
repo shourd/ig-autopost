@@ -23,6 +23,13 @@ from requests import RequestException
 
 from src.config import secret
 
+# Said once, recognised elsewhere: the health check treats this as news rather
+# than a failure, because no amount of attention will change it on a free plan.
+PLAN_NOTICE = (
+    "! phone reminders need a paid Todoist plan — the tasks are there with "
+    "their times, but Todoist won't push a notification"
+)
+
 API = "https://api.todoist.com/api/v1/tasks"
 ALARMS = "https://api.todoist.com/api/v1/reminders"
 TIMEOUT = 30
@@ -92,10 +99,7 @@ def _alarm(token: str, task_id: str, lead: int) -> str | None:
             timeout=TIMEOUT,
         )
         if resp.status_code in (402, 403):
-            return (
-                "! phone reminders need a paid Todoist plan — the tasks are there "
-                "with their times, but Todoist won't push a notification"
-            )
+            return PLAN_NOTICE
         resp.raise_for_status()
     except (RequestException, ValueError) as exc:
         return f"! reminder alarm failed: {exc}"
@@ -136,11 +140,18 @@ def sync(state, image_url) -> list[str]:
 
 
 def _apple(posts, cfg) -> list[str]:
-    """Mirror the posts into the Reminders app, alarm set `lead` ahead."""
-    if not cfg.publish.reminder_apple:
-        return []
+    """Mirror the posts into the Reminders app, alarm set `lead` ahead.
 
+    Switched off, this still runs with an empty list, which sweeps. Returning
+    early instead would strand whatever is already in the list: the sweep is
+    the only thing that ever deletes these, so turning the channel off would
+    leave it nagging about posts forever.
+    """
     from src.apple_reminders import Nudge, sync as apple_sync
+
+    if not cfg.publish.reminder_apple:
+        swept = apple_sync([], cfg.publish.reminder_apple_list)
+        return [] if swept and swept[0].startswith("Apple Reminders: 0") else swept
 
     lead = timedelta(minutes=cfg.publish.reminder_lead_minutes)
     nudges = [

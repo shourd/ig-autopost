@@ -88,6 +88,24 @@ def url_for(name, cfg):
     return f"https://raw.githubusercontent.com/o/r/main/photos/processed/{name}"
 
 
+@pytest.fixture(autouse=True)
+def reminders_app(monkeypatch):
+    """Stand in for the Reminders app, and record what it was asked to write.
+
+    Needed even when the Apple channel is off: switched off, `_apple` sweeps
+    with an empty list rather than returning early, so every path through
+    `sync` reaches osascript unless something like this is in the way.
+    """
+    calls = []
+
+    def fake_sync(nudges, list_name=None, run=None):
+        calls.append(list(nudges))
+        return [f"Apple Reminders: {len(nudges)} in the default list"]
+
+    monkeypatch.setattr("src.apple_reminders.sync", fake_sync)
+    return calls
+
+
 @pytest.fixture
 def todoist(monkeypatch):
     fake = FakeTodoist()
@@ -313,3 +331,24 @@ def test_a_todoist_outage_during_the_sweep_is_reported_not_raised(monkeypatch):
     gone, problem = reminders._sweep("token", written=set())
 
     assert gone == 0 and "sweeping stray" in problem
+
+
+def test_switching_the_apple_channel_off_sweeps_what_it_left(todoist, reminders_app):
+    """A channel turned off takes its reminders with it. The sweep is the only
+    thing that ever deletes them, so returning early would leave the list
+    nagging about posts for good."""
+    state = FakeState([Photo(file="a.jpg", caption="x")], apple=False)
+
+    reminders.sync(state, url_for)
+
+    assert reminders_app == [[]]  # called once, with nothing to write
+
+
+def test_the_apple_channel_on_writes_a_nudge_per_post(todoist, reminders_app):
+    state = FakeState([Photo(file="a.jpg"), Photo(file="b.jpg")], apple=True)
+
+    reminders.sync(state, url_for)
+
+    assert [n.title for n in reminders_app[0]] == [
+        "Post a.jpg to Instagram", "Post b.jpg to Instagram",
+    ]

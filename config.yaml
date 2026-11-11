@@ -47,10 +47,10 @@ publish:
   reminders: true
   reminder_count: 4         # only the next few — the queue can be a hundred deep
   reminder_lead_minutes: 120  # the phone buzzes this long before the slot
-  # Todoist keeps the caption and the links, but its own alarms need a paid
-  # plan, so the notification comes from the Reminders app instead — iCloud
-  # carries it to the phone.
-  reminder_apple: true
+  # Off since 11 Nov 2026: Sjoerd wants one nudge, from Todoist. Switched back
+  # on, the Reminders app is the channel that pushes to the phone without a
+  # paid Todoist plan — see `_alarm`, which only runs while this is off.
+  reminder_apple: false
   reminder_apple_list: null   # null = the default Reminders list
 
 caption:

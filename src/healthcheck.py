@@ -164,7 +164,8 @@ def refresh_reminders(state) -> list[Check]:
                       "The reminder sync failed; run: uv run python -m src.reminders")]
 
     return [
-        Check(not line.startswith("!"), "Reminders", line.lstrip("! ").strip(),
+        Check(not line.startswith("!") or line == reminders.PLAN_NOTICE,
+              "Reminders", line.lstrip("! ").strip(),
               "Reminders aren't being written — run: uv run python -m src.reminders")
         for line in log
     ] or [Check(True, "Reminders", "switched off in config.yaml")]

@@ -54,7 +54,19 @@ pushed back) loses its task, because a reminder to post something already live
 is worse than none. Only the next `reminder_count` posts get one; the queue can
 be a hundred deep.
 
-The notification itself comes from the **macOS Reminders app** (`publish.
+Which channel notifies is `publish.reminder_apple`. It is **off** as of 11 Nov
+2026 — one nudge, from Todoist — and with it off the code asks Todoist for a
+timed push instead, which a free plan refuses (`403 PREMIUM_ONLY`). The check
+reports that as news rather than a fault, since no amount of attention changes
+it; the practical effect is that the nudge arrives when the task falls due, not
+`reminder_lead_minutes` before. Turning the flag back on restores the
+two-hours-ahead push.
+
+Switching it off sweeps the reminders it had already written: the sweep is the
+only thing that ever deletes them, so a channel that simply stopped would leave
+its list nagging for good.
+
+With it on, the notification comes from the **macOS Reminders app** (`publish.
 reminder_apple`), set `reminder_lead_minutes` — default 120 — before the slot,
 and iCloud carries it to the phone. Todoist's own alarms answer `403
 PREMIUM_ONLY` on a free plan, which is why the two channels split: Todoist holds
